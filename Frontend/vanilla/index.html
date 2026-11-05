@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BS Bike Store — Domina Cualquier Terreno</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     HEADER
+═══════════════════════════════════════════ -->
+<header id="site-header">
+  <div class="header-inner">
+    <!-- Logo -->
+    <a href="#" class="logo-link" onclick="showSection('home')">
+      <span class="logo-text">BS</span>
+      <span class="logo-sub">BIKE STORE</span>
+    </a>
+
+    <!-- Desktop Nav -->
+    <nav class="desktop-nav">
+      <a href="#" onclick="scrollToSection('productos')">Inicio</a>
+      <a href="#" onclick="scrollToSection('productos')">Bicicletas</a>
+      <a href="#" onclick="scrollToSection('nosotros')">Nosotros</a>
+      <a href="#" onclick="scrollToSection('servicios')">Servicios</a>
+      <a href="#" onclick="scrollToSection('resenas')">Reseñas</a>
+      <a href="#" onclick="scrollToSection('contacto')">Contacto</a>
+    </nav>
+
+    <!-- Header Actions -->
+    <div class="header-actions">
+      <!-- Dark mode toggle -->
+      <button class="icon-btn" id="dark-toggle" title="Modo oscuro" onclick="toggleDark()">
+        <svg id="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg id="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      </button>
+
+      <!-- Wishlist -->
+      <button class="icon-btn" title="Lista de deseos" onclick="openWishlist()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        <span class="badge" id="wishlist-badge">0</span>
+      </button>
+
+      <!-- Cart -->
+      <button class="icon-btn" title="Carrito" onclick="openCart()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        <span class="badge" id="cart-badge">0</span>
+      </button>
+
+      <!-- Login -->
+      <button class="btn-outline btn-sm" onclick="openAuth()" id="login-btn">Iniciar Sesión</button>
+      <button class="btn-outline btn-sm" onclick="logout()" id="logout-btn" style="display:none">Cerrar Sesión</button>
+      <button class="btn-accent btn-sm" onclick="showAdmin()" id="admin-btn" style="display:none">Panel Admin</button>
+
+      <!-- Hamburger -->
+      <button class="icon-btn hamburger" id="hamburger" onclick="toggleMobileMenu()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Mobile Menu -->
+  <div class="mobile-menu" id="mobile-menu">
+    <a href="#" onclick="scrollToSection('productos');toggleMobileMenu()">Inicio</a>
+    <a href="#" onclick="scrollToSection('productos');toggleMobileMenu()">Bicicletas</a>
+    <a href="#" onclick="scrollToSection('nosotros');toggleMobileMenu()">Nosotros</a>
+    <a href="#" onclick="scrollToSection('servicios');toggleMobileMenu()">Servicios</a>
+    <a href="#" onclick="scrollToSection('resenas');toggleMobileMenu()">Reseñas</a>
+    <a href="#" onclick="scrollToSection('contacto');toggleMobileMenu()">Contacto</a>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════
+     MAIN STORE VIEW
+═══════════════════════════════════════════ -->
+<main id="store-view">
+
+  <!-- ── HERO ─────────────────────────────── -->
+  <section class="hero" id="home">
+    <div class="hero-content">
+      <span class="hero-badge">Nueva Colección 2026</span>
+      <h1 class="hero-title">Domina Cualquier<br><span class="accent-text">Terreno</span></h1>
+      <p class="hero-sub">Las mejores bicicletas de montaña, ruta y eléctricas con asesoría experta y entrega a todo Colombia.</p>
+      <div class="hero-btns">
+        <button class="btn-accent btn-lg" onclick="scrollToSection('productos')">Ver Bicicletas</button>
+        <button class="btn-ghost btn-lg" onclick="scrollToSection('nosotros')">Conoce el equipo</button>
+      </div>
+    </div>
+
+    <!-- Stats bar -->
+    <div class="hero-stats">
+      <div class="stat-item">
+        <span class="stat-num">500+</span>
+        <span class="stat-label">Bicicletas</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-num">4.9 ★</span>
+        <span class="stat-label">Calificación</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-num">5 años</span>
+        <span class="stat-label">Experiencia</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-num">24h</span>
+        <span class="stat-label">Soporte</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CATEGORIES + FILTERS ─────────────── -->
+  <section class="categories-bar" id="productos">
+    <div class="container">
+      <div class="cat-row">
+        <div class="cat-filters" id="cat-filters">
+          <button class="cat-btn active" data-cat="Todas" onclick="filterCategory(this,'Todas')">Todo Terreno</button>
+          <button class="cat-btn" data-cat="Todo Terreno" onclick="filterCategory(this,'Todo Terreno')">MTB</button>
+          <button class="cat-btn" data-cat="Ruta" onclick="filterCategory(this,'Ruta')">Ruta</button>
+          <button class="cat-btn" data-cat="Eléctrica" onclick="filterCategory(this,'Eléctrica')">Eléctrica</button>
+          <button class="cat-btn" data-cat="Infantil" onclick="filterCategory(this,'Infantil')">Infantil</button>
+        </div>
+        <div class="filter-controls">
+          <input type="number" id="price-min" placeholder="Precio mín." class="filter-input" />
+          <input type="number" id="price-max" placeholder="Precio máx." class="filter-input" />
+          <select id="sort-select" class="filter-input">
+            <option value="default">Más Recientes</option>
+            <option value="asc">Menor a Mayor</option>
+            <option value="desc">Mayor a Menor</option>
+          </select>
+          <button class="btn-accent btn-sm" onclick="applyFilters()">Aplicar</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PRODUCTS GRID ─────────────────────── -->
+  <section class="products-section">
+    <div class="container">
+      <div class="products-grid" id="products-grid">
+        <!-- Rendered by JS -->
+      </div>
+      <p class="no-results" id="no-results" style="display:none">No se encontraron productos con esos filtros.</p>
+    </div>
+  </section>
+
+  <!-- ── SERVICES ──────────────────────────── -->
+  <section class="services-section" id="servicios">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Taller y Servicios</h2>
+        <p class="section-sub">Mantenimiento profesional para que tu bicicleta siempre esté lista.</p>
+      </div>
+      <div class="services-grid">
+        <div class="service-card">
+          <div class="service-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          </div>
+          <h3>Mantenimiento General</h3>
+          <p>Revisión completa, lubricación, ajuste de frenos y transmisión.</p>
+          <span class="service-price">$85.000</span>
+        </div>
+        <div class="service-card">
+          <div class="service-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+          </div>
+          <h3>Ensamble Personalizado</h3>
+          <p>Construimos tu bicicleta ideal pieza por pieza según tus especificaciones.</p>
+          <span class="service-price">Desde $150.000</span>
+        </div>
+        <div class="service-card">
+          <div class="service-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="22"/><line x1="2" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="22" y2="12"/></svg>
+          </div>
+          <h3>Reparación de Pinchazos</h3>
+          <p>Cambio y reparación de llantas, cámaras y neumáticos tubeless.</p>
+          <span class="service-price">$25.000</span>
+        </div>
+        <div class="service-card">
+          <div class="service-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          </div>
+          <h3>Envío Nacional</h3>
+          <p>Enviamos tu bicicleta a cualquier rincón de Colombia con seguro incluido.</p>
+          <span class="service-price">Gratis &gt;$500K</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── NOSOTROS ──────────────────────────── -->
+  <section class="about-section" id="nosotros">
+    <div class="container about-grid">
+      <div class="about-text">
+        <span class="section-badge">Nuestra Historia</span>
+        <h2 class="section-title">Apasionados por las<br><span class="accent-text">Dos Ruedas</span></h2>
+        <p>BS Bike Store nació en 2021 con un sueño: llevar las mejores bicicletas del mundo al ciclista colombiano. Somos un equipo de ciclistas que entiende lo que necesitas porque lo vivimos cada fin de semana en las montañas.</p>
+        <p>Con más de 5 años de experiencia y 500 bicicletas vendidas, nos hemos convertido en el referente de confianza para ciclistas de todas las disciplinas en Colombia.</p>
+        <div class="about-stats">
+          <div><strong>500+</strong><span>Bicicletas vendidas</span></div>
+          <div><strong>2.000+</strong><span>Clientes felices</span></div>
+          <div><strong>5</strong><span>Años de experiencia</span></div>
+        </div>
+      </div>
+      <div class="about-img">
+        <img src="https://images.unsplash.com/photo-1532298229144-0ec0c57515c7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=800" alt="Ciclistas" loading="lazy" />
+      </div>
+    </div>
+  </section>
+
+  <!-- ── REVIEWS ───────────────────────────── -->
+  <section class="reviews-section" id="resenas">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Lo que dice nuestra comunidad</h2>
+        <p class="section-sub">Más de 2.000 ciclistas confían en BS Bike Store.</p>
+      </div>
+
+      <div class="reviews-grid" id="reviews-grid">
+        <!-- Rendered by JS -->
+      </div>
+
+      <!-- Review Form -->
+      <div class="review-form-wrap">
+        <h3>Deja tu reseña</h3>
+        <form id="review-form" onsubmit="submitReview(event)">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nombre</label>
+              <input type="text" id="rv-name" placeholder="Tu nombre" required />
+            </div>
+            <div class="form-group">
+              <label>Bicicleta comprada</label>
+              <input type="text" id="rv-bike" placeholder="Modelo" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Calificación</label>
+            <div class="star-picker" id="star-picker">
+              <span class="star-pick" data-v="1" onclick="pickStar(1)">★</span>
+              <span class="star-pick" data-v="2" onclick="pickStar(2)">★</span>
+              <span class="star-pick" data-v="3" onclick="pickStar(3)">★</span>
+              <span class="star-pick" data-v="4" onclick="pickStar(4)">★</span>
+              <span class="star-pick" data-v="5" onclick="pickStar(5)">★</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Comentario</label>
+            <textarea id="rv-comment" rows="4" placeholder="Cuéntanos tu experiencia..." required></textarea>
+          </div>
+          <button type="submit" class="btn-accent">Publicar Reseña</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CONTACT ───────────────────────────── -->
+  <section class="contact-section" id="contacto">
+    <div class="container contact-grid">
+      <div class="contact-info">
+        <span class="section-badge">Contáctanos</span>
+        <h2 class="section-title">¿Tienes preguntas?<br>Estamos aquí</h2>
+        <div class="contact-items">
+          <div class="contact-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span>Medellín, Antioquia, Colombia</span>
+          </div>
+          <div class="contact-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.42 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.86a16 16 0 0 0 6 6l.86-1.14a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            <span>+57 (304) 123-4567</span>
+          </div>
+          <div class="contact-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <span>info@bsbikestore.co</span>
+          </div>
+        </div>
+      </div>
+      <form class="contact-form" onsubmit="submitContact(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nombre</label>
+            <input type="text" placeholder="Tu nombre" required />
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" placeholder="tu@email.com" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Asunto</label>
+          <input type="text" placeholder="¿En qué te ayudamos?" required />
+        </div>
+        <div class="form-group">
+          <label>Mensaje</label>
+          <textarea rows="5" placeholder="Escríbenos..." required></textarea>
+        </div>
+        <button type="submit" class="btn-accent">Enviar Mensaje</button>
+      </form>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══════════════════════════════════════════
+     ADMIN PANEL
+═══════════════════════════════════════════ -->
+<div id="admin-panel" style="display:none">
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="admin-logo">
+        <span class="logo-text">BS</span>
+        <span class="logo-sub">ADMIN</span>
+      </div>
+      <nav class="admin-nav">
+        <a class="admin-nav-item active" data-tab="dashboard" onclick="switchAdminTab('dashboard',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Dashboard
+        </a>
+        <a class="admin-nav-item" data-tab="pedidos" onclick="switchAdminTab('pedidos',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Pedidos
+        </a>
+        <a class="admin-nav-item" data-tab="productos-admin" onclick="switchAdminTab('productos-admin',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+          Productos
+        </a>
+        <a class="admin-nav-item" data-tab="inventario" onclick="switchAdminTab('inventario',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+          Inventario
+        </a>
+        <a class="admin-nav-item" data-tab="usuarios" onclick="switchAdminTab('usuarios',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Usuarios
+        </a>
+        <a class="admin-nav-item" data-tab="resenas-admin" onclick="switchAdminTab('resenas-admin',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Reseñas
+        </a>
+        <a class="admin-nav-item" data-tab="reportes" onclick="switchAdminTab('reportes',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Reportes
+        </a>
+        <a class="admin-nav-item" data-tab="pagos" onclick="switchAdminTab('pagos',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          Pagos
+        </a>
+      </nav>
+      <button class="btn-outline btn-sm admin-exit" onclick="hideAdmin()">← Volver a la Tienda</button>
+    </aside>
+
+    <!-- Admin Content -->
+    <div class="admin-content">
+
+      <!-- Dashboard -->
+      <div class="admin-tab active" id="tab-dashboard">
+        <h2 class="admin-title">Dashboard</h2>
+        <div class="stat-cards">
+          <div class="stat-card">
+            <span class="stat-card-label">Ventas Hoy</span>
+            <span class="stat-card-val">$3.450.000</span>
+            <span class="stat-card-trend up">+12% vs ayer</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-card-label">Pedidos Nuevos</span>
+            <span class="stat-card-val">14</span>
+            <span class="stat-card-trend up">+3 desde ayer</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-card-label">Clientes Activos</span>
+            <span class="stat-card-val">2.183</span>
+            <span class="stat-card-trend up">+47 este mes</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-card-label">Ingresos Mes</span>
+            <span class="stat-card-val">$87.200.000</span>
+            <span class="stat-card-trend up">+8% vs mes anterior</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-card-label">Productos Activos</span>
+            <span class="stat-card-val">16</span>
+            <span class="stat-card-trend neutral">Sin cambios</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-card-label">Calificación Promedio</span>
+            <span class="stat-card-val">4.9 ★</span>
+            <span class="stat-card-trend up">Excelente</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pedidos -->
+      <div class="admin-tab" id="tab-pedidos">
+        <h2 class="admin-title">Pedidos</h2>
+        <div class="table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr><th>#</th><th>Cliente</th><th>Producto</th><th>Total</th><th>Estado</th><th>Fecha</th><th>Acción</th></tr>
+            </thead>
+            <tbody id="orders-tbody">
+              <!-- Rendered by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Productos Admin -->
+      <div class="admin-tab" id="tab-productos-admin">
+        <div class="admin-tab-header">
+          <h2 class="admin-title">Productos</h2>
+          <button class="btn-accent btn-sm" onclick="openProductForm()">+ Añadir Producto</button>
+        </div>
+        <div class="table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr><th>ID</th><th>Nombre</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Rating</th><th>Acciones</th></tr>
+            </thead>
+            <tbody id="products-admin-tbody">
+              <!-- Rendered by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Inventario -->
+      <div class="admin-tab" id="tab-inventario">
+        <h2 class="admin-title">Inventario</h2>
+        <div class="table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr><th>Producto</th><th>Categoría</th><th>Stock</th><th>Estado</th><th>Acción</th></tr>
+            </thead>
+            <tbody id="inventory-tbody">
+              <!-- Rendered by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Usuarios -->
+      <div class="admin-tab" id="tab-usuarios">
+        <h2 class="admin-title">Usuarios</h2>
+        <div class="table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Pedidos</th><th>Estado</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Carlos Ospina</td><td>carlos@email.com</td><td><span class="badge-status blue">Cliente</span></td><td>5</td><td><span class="badge-status green">Activo</span></td></tr>
+              <tr><td>Valentina Ríos</td><td>vale@email.com</td><td><span class="badge-status blue">Cliente</span></td><td>3</td><td><span class="badge-status green">Activo</span></td></tr>
+              <tr><td>Admin BS</td><td>admin@bsbikestore.co</td><td><span class="badge-status orange">Admin</span></td><td>—</td><td><span class="badge-status green">Activo</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Reseñas Admin -->
+      <div class="admin-tab" id="tab-resenas-admin">
+        <h2 class="admin-title">Reseñas</h2>
+        <div class="table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr><th>Nombre</th><th>Bicicleta</th><th>Rating</th><th>Comentario</th><th>Fecha</th><th>Acción</th></tr>
+            </thead>
+            <tbody id="reviews-admin-tbody">
+              <!-- Rendered by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Reportes -->
+      <div class="admin-tab" id="tab-reportes">
+        <h2 class="admin-title">Reportes</h2>
+        <h3 class="admin-subtitle">Top Clientes por Compras</h3>
+        <div class="report-list" id="report-list">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+
+      <!-- Pagos -->
+      <div class="admin-tab" id="tab-pagos">
+        <h2 class="admin-title">Validación de Pagos</h2>
+        <div class="table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr><th>ID Pago</th><th>Cliente</th><th>Monto</th><th>Método</th><th>Estado</th><th>Acción</th></tr>
+            </thead>
+            <tbody id="payments-tbody">
+              <!-- Rendered by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /admin-content -->
+  </div><!-- /admin-layout -->
+</div><!-- /admin-panel -->
+
+<!-- ═══════════════════════════════════════════
+     FOOTER
+═══════════════════════════════════════════ -->
+<footer class="site-footer" id="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-brand">
+      <div class="footer-logo">
+        <span class="logo-text">BS</span>
+        <span class="logo-sub">BIKE STORE</span>
+      </div>
+      <p>Las mejores bicicletas de montaña, ruta y eléctricas. Asesoría experta y entrega a todo Colombia.</p>
+      <div class="social-links">
+        <a href="#" title="Instagram" class="social-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+        </a>
+        <a href="#" title="Facebook" class="social-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+        </a>
+        <a href="#" title="YouTube" class="social-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 0 0-1.95 1.96A29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58A2.78 2.78 0 0 0 3.41 19.6C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.95A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"/></svg>
+        </a>
+      </div>
+    </div>
+    <div class="footer-links">
+      <h4>Tienda</h4>
+      <ul>
+        <li><a href="#" onclick="scrollToSection('productos')">Bicicletas</a></li>
+        <li><a href="#" onclick="scrollToSection('servicios')">Servicios</a></li>
+        <li><a href="#" onclick="scrollToSection('nosotros')">Sobre Nosotros</a></li>
+        <li><a href="#" onclick="scrollToSection('resenas')">Reseñas</a></li>
+      </ul>
+    </div>
+    <div class="footer-links">
+      <h4>Soporte</h4>
+      <ul>
+        <li><a href="#" onclick="scrollToSection('contacto')">Contacto</a></li>
+        <li><a href="#">Política de Envíos</a></li>
+        <li><a href="#">Garantías</a></li>
+        <li><a href="#">Devoluciones</a></li>
+      </ul>
+    </div>
+    <div class="footer-links">
+      <h4>Contacto</h4>
+      <ul>
+        <li><a href="tel:+573041234567">+57 (304) 123-4567</a></li>
+        <li><a href="mailto:info@bsbikestore.co">info@bsbikestore.co</a></li>
+        <li><span>Lun–Sáb: 8am – 6pm</span></li>
+        <li><span>Medellín, Antioquia</span></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>© 2026 BS Bike Store. Todos los derechos reservados.</p>
+  </div>
+</footer>
+
+<!-- ═══════════════════════════════════════════
+     MODALS & DRAWERS
+═══════════════════════════════════════════ -->
+
+<!-- Overlay -->
+<div class="overlay" id="overlay" onclick="closeAll()"></div>
+
+<!-- AUTH MODAL -->
+<div class="modal" id="auth-modal">
+  <button class="modal-close" onclick="closeAuth()">✕</button>
+
+  <!-- Normal auth (login/register) -->
+  <div id="auth-main">
+    <div class="modal-logo">
+      <span class="logo-text">BS</span>
+      <span class="logo-sub">BIKE STORE</span>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tab-login" onclick="switchAuthTab('login')">Iniciar Sesión</button>
+      <button class="tab-btn" id="tab-register" onclick="switchAuthTab('register')">Registrarse</button>
+    </div>
+
+    <!-- Login form -->
+    <form id="login-form" onsubmit="doLogin(event)">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="l-email" placeholder="tu@email.com" required />
+      </div>
+      <div class="form-group">
+        <label>Contraseña</label>
+        <input type="password" id="l-pass" placeholder="••••••••" required />
+      </div>
+      <div class="form-group">
+        <label>Rol</label>
+        <select id="l-role">
+          <option value="client">Cliente</option>
+          <option value="admin">Administrador</option>
+        </select>
+      </div>
+      <div id="auth-error" class="form-error" style="display:none"></div>
+      <button type="submit" class="btn-accent w-full">Entrar</button>
+      <button type="button" class="btn-link" onclick="showForgot()">¿Olvidaste tu contraseña?</button>
+    </form>
+
+    <!-- Register form -->
+    <form id="register-form" style="display:none" onsubmit="doRegister(event)">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nombre</label>
+          <input type="text" id="r-name" placeholder="Tu nombre" required />
+        </div>
+        <div class="form-group">
+          <label>Apellido</label>
+          <input type="text" id="r-lastname" placeholder="Tu apellido" required />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="r-email" placeholder="tu@email.com" required />
+      </div>
+      <div class="form-group">
+        <label>Contraseña</label>
+        <input type="password" id="r-pass" placeholder="Mínimo 6 caracteres" required minlength="6" />
+      </div>
+      <div class="form-group">
+        <label>Rol</label>
+        <select id="r-role">
+          <option value="client">Cliente</option>
+          <option value="admin">Administrador</option>
+        </select>
+      </div>
+      <div id="reg-error" class="form-error" style="display:none"></div>
+      <button type="submit" class="btn-accent w-full">Crear Cuenta</button>
+    </form>
+  </div>
+
+  <!-- Forgot password -->
+  <div id="auth-forgot" style="display:none">
+    <h3 class="modal-subtitle">Recuperar Contraseña</h3>
+    <p class="modal-desc">Ingresa tu email y te enviaremos un enlace para recuperar tu contraseña.</p>
+    <form onsubmit="doForgot(event)">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="forgot-email" placeholder="tu@email.com" required />
+      </div>
+      <div id="forgot-success" class="form-success" style="display:none">Email enviado. Revisa tu bandeja de entrada.</div>
+      <button type="submit" class="btn-accent w-full">Enviar enlace</button>
+      <button type="button" class="btn-link" onclick="hideForgot()">← Volver al login</button>
+    </form>
+  </div>
+</div>
+
+<!-- CART DRAWER -->
+<div class="drawer drawer-right" id="cart-drawer">
+  <div class="drawer-header">
+    <h3>Mi Carrito</h3>
+    <button class="modal-close" onclick="closeCart()">✕</button>
+  </div>
+  <div class="drawer-body" id="cart-body">
+    <!-- Rendered by JS -->
+  </div>
+  <div class="drawer-footer" id="cart-footer" style="display:none">
+    <div class="cart-total">
+      <span>Total:</span>
+      <strong id="cart-total-val">$0</strong>
+    </div>
+    <button class="btn-accent w-full" onclick="openCheckout()">Proceder al Pago</button>
+  </div>
+</div>
+
+<!-- WISHLIST DRAWER -->
+<div class="drawer drawer-right" id="wishlist-drawer">
+  <div class="drawer-header">
+    <h3>Lista de Deseos</h3>
+    <button class="modal-close" onclick="closeWishlist()">✕</button>
+  </div>
+  <div class="drawer-body" id="wishlist-body">
+    <!-- Rendered by JS -->
+  </div>
+</div>
+
+<!-- PRODUCT DETAIL MODAL -->
+<div class="modal modal-lg" id="product-modal">
+  <button class="modal-close" onclick="closeProductModal()">✕</button>
+  <div class="product-modal-content" id="product-modal-content">
+    <!-- Rendered by JS -->
+  </div>
+</div>
+
+<!-- CHECKOUT MODAL -->
+<div class="modal modal-lg" id="checkout-modal">
+  <button class="modal-close" onclick="closeCheckout()">✕</button>
+  <div class="checkout-header">
+    <h2>Finalizar Compra</h2>
+    <div class="checkout-steps" id="checkout-steps">
+      <div class="step active" data-step="1">1 Datos</div>
+      <div class="step-line"></div>
+      <div class="step" data-step="2">2 Envío</div>
+      <div class="step-line"></div>
+      <div class="step" data-step="3">3 Pago</div>
+      <div class="step-line"></div>
+      <div class="step" data-step="4">4 Confirmación</div>
+    </div>
+  </div>
+
+  <!-- Step 1: Datos personales -->
+  <div class="checkout-step-content" id="co-step-1">
+    <h3>Datos Personales</h3>
+    <div class="form-row">
+      <div class="form-group"><label>Nombre</label><input type="text" id="co-name" placeholder="Tu nombre" /></div>
+      <div class="form-group"><label>Apellido</label><input type="text" id="co-last" placeholder="Tu apellido" /></div>
+    </div>
+    <div class="form-group"><label>Email</label><input type="email" id="co-email" placeholder="tu@email.com" /></div>
+    <div class="form-group"><label>Teléfono</label><input type="tel" id="co-phone" placeholder="+57 300 000 0000" /></div>
+    <div class="form-group"><label>Documento de identidad</label><input type="text" id="co-doc" placeholder="CC / NIT" /></div>
+    <button class="btn-accent" onclick="nextStep(2)">Continuar →</button>
+  </div>
+
+  <!-- Step 2: Envío -->
+  <div class="checkout-step-content" id="co-step-2" style="display:none">
+    <h3>Información de Envío</h3>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Departamento</label>
+        <select id="co-dept" onchange="updateCities()">
+          <option value="">Selecciona departamento</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Ciudad</label>
+        <select id="co-city">
+          <option value="">Selecciona ciudad</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label>Dirección</label><input type="text" id="co-addr" placeholder="Calle, número, barrio" /></div>
+    <div class="form-group"><label>Código postal</label><input type="text" id="co-zip" placeholder="Código postal" /></div>
+    <div class="form-group"><label>Notas adicionales</label><textarea id="co-notes" rows="3" placeholder="Indicaciones especiales..."></textarea></div>
+    <div class="btn-row">
+      <button class="btn-outline" onclick="nextStep(1)">← Atrás</button>
+      <button class="btn-accent" onclick="nextStep(3)">Continuar →</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Pago -->
+  <div class="checkout-step-content" id="co-step-3" style="display:none">
+    <h3>Método de Pago</h3>
+    <div class="pay-methods">
+      <label class="pay-option">
+        <input type="radio" name="pay-method" value="card" checked />
+        <div class="pay-option-content">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          <span>Tarjeta de Crédito/Débito</span>
+        </div>
+      </label>
+      <label class="pay-option">
+        <input type="radio" name="pay-method" value="pse" />
+        <div class="pay-option-content">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <span>PSE (Débito Bancario)</span>
+        </div>
+      </label>
+      <label class="pay-option">
+        <input type="radio" name="pay-method" value="efecty" />
+        <div class="pay-option-content">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <span>Efecty / Baloto</span>
+        </div>
+      </label>
+    </div>
+    <!-- Card fields -->
+    <div class="card-fields">
+      <div class="form-group"><label>Número de tarjeta</label><input type="text" placeholder="1234 5678 9012 3456" maxlength="19" /></div>
+      <div class="form-row">
+        <div class="form-group"><label>Vencimiento</label><input type="text" placeholder="MM/AA" maxlength="5" /></div>
+        <div class="form-group"><label>CVV</label><input type="text" placeholder="123" maxlength="4" /></div>
+      </div>
+      <div class="form-group"><label>Nombre en la tarjeta</label><input type="text" placeholder="Como aparece en la tarjeta" /></div>
+    </div>
+    <!-- Order summary -->
+    <div class="order-summary" id="order-summary"></div>
+    <div class="btn-row">
+      <button class="btn-outline" onclick="nextStep(2)">← Atrás</button>
+      <button class="btn-accent" onclick="nextStep(4)">Pagar Ahora</button>
+    </div>
+  </div>
+
+  <!-- Step 4: Confirmación -->
+  <div class="checkout-step-content" id="co-step-4" style="display:none">
+    <div class="confirmation">
+      <div class="confirm-icon">✓</div>
+      <h3>¡Pedido Confirmado!</h3>
+      <p>Tu pedido ha sido recibido. Te enviaremos un email con el seguimiento.</p>
+      <p class="order-num">Pedido #<span id="confirm-order-num"></span></p>
+      <button class="btn-accent" onclick="closeCheckout();clearCart()">Volver a la Tienda</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST NOTIFICATION -->
+<div class="toast" id="toast"></div>
+
+<script src="script.js"></script>
+</body>
+</html>

@@ -1,12 +1,4 @@
 node_modules/
+dist/
 .env
-.env.local
-.env.development
-.env.*.local
 npm-debug.log*
-
-
-uploads/equipos/*
-!uploads/equipos/.gitkeep
-
-**/package-lock.json

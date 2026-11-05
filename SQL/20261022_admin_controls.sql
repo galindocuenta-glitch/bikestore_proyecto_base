@@ -1,0 +1,13 @@
+USE bs_bike_store;
+
+CREATE TABLE IF NOT EXISTS offers (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(120) NOT NULL,
+  discount TINYINT UNSIGNED NOT NULL,
+  code VARCHAR(40) NOT NULL UNIQUE,
+  valid_until DATE NULL,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT chk_offers_discount CHECK (discount BETWEEN 1 AND 100),
+  INDEX idx_offers_active (active, valid_until)
+);

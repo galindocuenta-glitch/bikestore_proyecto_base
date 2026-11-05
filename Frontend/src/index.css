@@ -1,0 +1,184 @@
+@import 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Montserrat:wght@700;800;900&display=swap';
+@import 'tailwindcss';
+
+@theme {
+  --color-accent: #0D5C3A;
+  --color-accent-light: #1A8A5A;
+  --color-charcoal: #1A1A1A;
+  --color-off-white: #F4F4F5;
+  --font-sans: 'Inter', sans-serif;
+  --font-display: 'Montserrat', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  color: #1A1A1A;
+  background: #ffffff;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+header { transition: background-color 0.3s ease, border-color 0.3s ease; }
+
+/* Global input defaults */
+input, select, textarea { color: #1A1A1A; background-color: #ffffff; }
+
+/* Product card image area */
+.card-img-bg { background: #f4f5f7; }
+
+/* Sharp, vivid images globally */
+img {
+  filter: contrast(1.08) saturate(1.18) brightness(1.02);
+  image-rendering: -webkit-optimize-contrast;
+}
+/* Hero / full-bleed photos — slightly more vivid */
+.img-hero {
+  filter: contrast(1.12) saturate(1.25) brightness(1.03);
+}
+/* Product images — crisp and punchy */
+.img-product {
+  filter: contrast(1.1) saturate(1.2) brightness(1.04);
+}
+/* Gallery thumbnails */
+.img-thumb {
+  filter: contrast(1.06) saturate(1.15) brightness(1.02);
+}
+
+/* ═══════════════════════════════════════════════════
+   DARK MODE — Complete visual system
+   palette:
+     bg-base    #0D1117  (page)
+     bg-surface #161B22  (cards, modals)
+     bg-raised  #21262D  (table heads, hover, inputs)
+     border     #30363D
+     text-1     #E6EDF3  (headings, strong)
+     text-2     #8B949E  (body, secondary)
+     text-3     #6E7681  (muted, placeholders)
+     green      #2ECC71  (accent on dark)
+════════════════════════════════════════════════════ */
+
+/* ── Page & layout ── */
+.dark body { background-color: #0D1117 !important; color: #C9D1D9 !important; }
+.dark section, .dark main { background-color: #0D1117; }
+
+/* ── Header / nav ── */
+.dark header {
+  background-color: #161B22 !important;
+  border-color: #30363D !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.06) !important;
+}
+.dark nav { background-color: #161B22 !important; border-color: #30363D !important; }
+
+/* ── Surfaces (cards, panels, modals) ── */
+.dark .bg-white { background-color: #161B22 !important; }
+.dark .bg-gray-50 { background-color: #0D1117 !important; }
+.dark .bg-gray-100 { background-color: #21262D !important; }
+.dark .bg-\[\#F4F4F5\] { background-color: #0D1117 !important; }
+.dark .bg-\[\#f8f9fa\] { background-color: #21262D !important; }
+.dark .card-img-bg { background: #21262D !important; }
+
+/* Admin sidebar — keep very dark */
+.dark .bg-\[\#1A1A1A\] { background-color: #010409 !important; }
+/* Admin main area background */
+.dark .bg-\[\#F4F4F5\]\/50 { background-color: rgba(33,38,45,0.5) !important; }
+
+/* ── Borders ── */
+.dark .border-gray-100 { border-color: #30363D !important; }
+.dark .border-gray-200 { border-color: #30363D !important; }
+.dark [class*="border-gray"] { border-color: #30363D !important; }
+.dark .divide-gray-100 > * + * { border-color: #30363D !important; }
+
+/* ── Typography ── */
+.dark h1, .dark h2, .dark h3, .dark h4, .dark h5 { color: #E6EDF3 !important; }
+.dark .text-\[\#1A1A1A\] { color: #E6EDF3 !important; }
+.dark .text-gray-700 { color: #C9D1D9 !important; }
+.dark .text-gray-600 { color: #8B949E !important; }
+.dark .text-gray-500 { color: #8B949E !important; }
+.dark .text-gray-400 { color: #6E7681 !important; }
+.dark .text-white { color: #fff !important; }
+
+/* Green accent — brighter on dark for legibility */
+.dark .text-\[\#0D5C3A\] { color: #2ECC71 !important; }
+.dark .text-\[\#1A8A5A\] { color: #2ECC71 !important; }
+.dark .bg-\[\#0D5C3A\]\/10 { background-color: rgba(46,204,113,0.12) !important; }
+.dark .bg-\[\#1A8A5A\]\/10 { background-color: rgba(46,204,113,0.12) !important; }
+
+/* Keep green buttons green (don't override) */
+/* .dark .bg-[#0D5C3A] stays as-is — green on dark looks great */
+
+/* ── Tables ── */
+.dark table { color: #C9D1D9 !important; }
+.dark thead { background-color: #21262D !important; }
+.dark tbody tr:hover { background-color: rgba(33,38,45,0.8) !important; }
+.dark td, .dark th { border-color: #30363D !important; color: #C9D1D9 !important; }
+.dark .hover\:bg-\[\#F4F4F5\]\/50:hover { background-color: rgba(33,38,45,0.6) !important; }
+
+/* ── Inputs ── */
+.dark input, .dark select, .dark textarea {
+  background-color: #21262D !important;
+  color: #E6EDF3 !important;
+  border-color: #30363D !important;
+}
+.dark input::placeholder, .dark textarea::placeholder { color: #6E7681 !important; }
+.dark label { color: #8B949E !important; }
+
+/* ── Interactive ── */
+.dark .hover\:bg-gray-50:hover { background-color: #161B22 !important; }
+.dark .hover\:bg-gray-100:hover { background-color: #21262D !important; }
+.dark .hover\:bg-\[\#F4F4F5\]:hover { background-color: #21262D !important; }
+
+/* ── Shadows ── */
+.dark .shadow-sm { box-shadow: 0 1px 4px rgba(0,0,0,0.6) !important; }
+.dark .shadow-md { box-shadow: 0 4px 16px rgba(0,0,0,0.6) !important; }
+.dark .shadow-lg { box-shadow: 0 8px 32px rgba(0,0,0,0.7) !important; }
+.dark .shadow-2xl { box-shadow: 0 20px 60px rgba(0,0,0,0.8) !important; }
+.dark .rounded-2xl, .dark .rounded-xl { box-shadow: 0 2px 12px rgba(0,0,0,0.4); }
+
+/* ── Backdrop blur overlays ── */
+.dark .backdrop-blur-sm { backdrop-filter: blur(4px); }
+
+/* ── Stat badges & pills ── */
+.dark .bg-green-100 { background-color: rgba(46,204,113,0.15) !important; }
+.dark .text-green-700 { color: #2ECC71 !important; }
+.dark .bg-amber-100 { background-color: rgba(245,158,11,0.15) !important; }
+.dark .text-amber-700 { color: #F59E0B !important; }
+.dark .bg-red-100 { background-color: rgba(239,68,68,0.15) !important; }
+.dark .text-red-600 { color: #F87171 !important; }
+.dark .bg-blue-100 { background-color: rgba(59,130,246,0.15) !important; }
+.dark .text-blue-700 { color: #60A5FA !important; }
+
+/* ── Footer ── */
+.dark footer { background-color: #010409 !important; border-color: #30363D !important; }
+
+/* ── Hero / large sections ── */
+.dark .bg-\[\#0D5C3A\] { /* keep green */ }
+.dark .bg-\[\#1A1A1A\]\/80 { background-color: rgba(1,4,9,0.85) !important; }
+
+/* ── Scrollbars in dark mode ── */
+.dark ::-webkit-scrollbar { width: 6px; height: 6px; }
+.dark ::-webkit-scrollbar-track { background: #0D1117; }
+.dark ::-webkit-scrollbar-thumb { background: #30363D; border-radius: 3px; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #484F58; }
+
+/* ── Product card hover in dark ── */
+.dark .hover\:shadow-2xl:hover { box-shadow: 0 20px 60px rgba(0,0,0,0.8) !important; }
+
+/* ── Wishlist / cart sidebar ── */
+.dark .bg-\[\#0D5C3A\]\/5 { background-color: rgba(46,204,113,0.06) !important; }
+
+/* ── Range / progress bars ── */
+.dark .bg-gray-200 { background-color: #30363D !important; }
+
+/* ═══ Animations ═══ */
+.btn-transition { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.modal-animate { animation: modalIn 0.2s ease-out; }
+
+@keyframes adminFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

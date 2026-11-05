@@ -1,0 +1,76 @@
+{
+  "planHash": "7015cd4b602789a184c3afef64c5069afa42860ae76cfe8ba298259e36974f7d",
+  "phase": "postupgrade",
+  "recordedAtUtc": "2026-10-22T20:47:57.8629232Z",
+  "retryCount": 2,
+  "resetBaseline": false,
+  "complete": true,
+  "result": {
+    "setupSucceeded": true,
+    "setupDurationMs": 4462,
+    "setupFailureOutput": null,
+    "assertions": [
+      {
+        "name": "backend-build",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "\r\n\u003E bs-bike-store-backend@1.0.0 build\r\n\u003E tsc -p tsconfig.json\r\n\r\n",
+        "durationMs": 1990
+      },
+      {
+        "name": "auth-me-requires-authentication",
+        "kind": "http-probe",
+        "verificationMethod": "http-status",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": null,
+        "outputSample": "HTTP 401\n{\u0022error\u0022:\u0022Debes iniciar sesi\u00F3n para continuar.\u0022}\n--- server output ---\n\r\n\u003E bs-bike-store-backend@1.0.0 dev\r\n\u003E tsx watch src/server.ts\r\n\r\nBS Bike Store API disponible en http://localhost:4000/api\r\n",
+        "durationMs": 1551
+      }
+    ],
+    "executions": [
+      {
+        "source": "setup[0]",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "ci"
+        ],
+        "cwd": "C:\\Users\\ASUS\\Desktop\\BS\\Backend",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "backend-build",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "run",
+          "build"
+        ],
+        "cwd": "C:\\Users\\ASUS\\Desktop\\BS\\Backend",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "auth-me-requires-authentication",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "run",
+          "dev"
+        ],
+        "cwd": "C:\\Users\\ASUS\\Desktop\\BS\\Backend",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      }
+    ]
+  }
+}

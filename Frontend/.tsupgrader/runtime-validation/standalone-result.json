@@ -1,0 +1,137 @@
+{
+  "planHash": "c7524917c2ab3136053920dadaeb229c8d2e6ee53da41c76e20ea1f6437cef10",
+  "phase": "standalone",
+  "recordedAtUtc": "2026-10-22T23:05:29.9485122Z",
+  "retryCount": 1,
+  "resetBaseline": false,
+  "complete": true,
+  "result": {
+    "setupSucceeded": true,
+    "setupDurationMs": 129,
+    "setupFailureOutput": null,
+    "assertions": [
+      {
+        "name": "tsc-no-emit",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "",
+        "durationMs": 2933
+      },
+      {
+        "name": "production-build",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "$ vite build\r\n\u001B[36mvite v8.0.5 \u001B[32mbuilding client environment for production...\u001B[36m\u001B[39m\r\n\u001B[2K\r\ntransforming...\u2713 65 modules transformed.\r\nrendering chunks...\r\ncomputing gzip size...\r\ndist/robots.txt                                                                                                        0.02 kB \u2502 gzip:   0.04 kB\r\ndist/index.html                                                                                                        0.90 kB \u2502 gzip:   0.43 kB\r\ndist/assets/tire-urban-CeNJufPy.jpg                                                                                   40.21 kB\r\ndist/assets/tube-schwalbe-CevFXQYB.jpg                                                                                46.01 kB\r\ndist/assets/tire-mtb-DIsUSM0O.jpg                                                                                     49.49 kB\r\ndist/assets/tubeless-refill-DwkxJd6U.jpg                                                                              51.51 kB\r\ndist/assets/bike-68-OsvwJzLe.png                                                                                      54.71 kB\r\ndist/assets/logo-user-zaMgeOH-.png                                                                                    55.74 kB\r\ndist/assets/tube-presta-Pf6RZAPj.jpg                                                                                  60.89 kB\r\ndist/assets/tire-vittoria-D1CIiVEk.jpg                                                                                61.41 kB\r\ndist/assets/tire-lugano-Dytenwki.jpg                                                                                  64.79 kB\r\ndist/assets/rim-mavic-CrlNUclB.jpg                                                                                    70.02 kB\r\ndist/assets/tube-repair-CdW-G9YJ.jpg                                                                                  70.35 kB\r\ndist/assets/bike-58-JpQseFuu.png                                                                                      71.18 kB\r\ndist/assets/rim-road-D3F_mRhY.jpg                                                                                     80.81 kB\r\ndist/assets/bike-69-Dfmr6Tba.png                                                                                      81.53 kB\r\ndist/assets/tubeless-co2-C23kNjeW.jpg                                                                                 83.42 kB\r\ndist/assets/rim-mtb-CRI36ugu.jpg                                                                                      92.38 kB\r\ndist/assets/tube-loose-jX3ImD8k.jpg                                                                                  100.26 kB\r\ndist/assets/tubeless-slime-D-ANH2cR.jpg                                                                              106.33 kB\r\ndist/assets/Nova-Specialiazed-epic-2018-full-suspension-BO7AVoZ1.jpg                                                 109.80 kB\r\ndist/assets/tubeless-innovations-D8hDSYaZ.jpg                                                                        114.37 kB\r\ndist/assets/333859-800-auto-Dg0cF_rU.png                                                                             117.76 kB\r\ndist/assets/rim-front-ByLodrBV.jpg                                                                                   121.77 kB\r\ndist/assets/83963316-8468-4caf-9a55-f139f603195e-CZXceGio.jfif                                                       130.41 kB\r\ndist/assets/bike-59-jozsGPmF.png                                                                                     131.87 kB\r\ndist/assets/bike-70-CvPCcK4B.png                                                                                     132.21 kB\r\ndist/assets/bike-67-DqW1dobv.png                                                                                     148.21 kB\r\ndist/assets/specialized_01-1LoVZQA1.jpg                                                                              157.14 kB\r\ndist/assets/bike-66-BL8pUrUQ.png                                                                                     196.22 kB\r\ndist/assets/5d666b970ce694fd528b4b\n\u2026[truncated]",
+        "durationMs": 903
+      },
+      {
+        "name": "dev-server-serves-home",
+        "kind": "http-probe",
+        "verificationMethod": "http-status",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": null,
+        "outputSample": "HTTP 200\n\u003C!doctype html\u003E\n\u003Chtml lang=\u0022en\u0022\u003E\n  \u003Chead\u003E\n    \u003Cscript type=\u0022module\u0022\u003Eimport { injectIntoGlobalHook } from \u0022/@react-refresh\u0022;\ninjectIntoGlobalHook(window);\nwindow.$RefreshReg$ = () =\u003E {};\nwindow.$RefreshSig$ = () =\u003E (type) =\u003E type;\u003C/script\u003E\n\n    \u003Cscript type=\u0022module\u0022 src=\u0022/@vite/client\u0022\u003E\u003C/script\u003E\n\n    \n    \u003Cmeta charset=\u0022UTF-8\u0022 /\u003E\n    \u003Cmeta name=\u0022viewport\u0022 content=\u0022width=device-width, initial-scale=1.0\u0022 /\u003E\n    \u003Ctitle\u003EFigma Make App\u003C/title\u003E\n    \n    \u003Cmeta name=\u0022description\u0022 content=\u0022Discover high-performance bikes and essential services at BICICENTER BIKESTORE, your go-to e-commerce platform for cycling enthusiasts in Spanish.\u0022\u003E\n    \u003Cmeta name=\u0022robots\u0022 content=\u0022noindex, nofollow\u0022\u003E\n    \u003Cmeta property=\u0022og:title\u0022 content=\u0022Figma Make App\u0022\u003E\n    \u003Cmeta property=\u0022og:description\u0022 content=\u0022Discover high-performance bikes and essential services at BICICENTER BIKESTORE, your go-to e-commerce platform for cycling enthusiasts in Spanish.\u0022\u003E\n  \u003C/head\u003E\n  \u003Cbody\u003E\n    \n    \u003Cdiv id=\u0022root\u0022\u003E\u003C/div\u003E\n    \u003Cscript type=\u0022module\u0022 src=\u0022/src/main.tsx\u0022\u003E\u003C/script\u003E\n    \n  \u003C/body\u003E\n\u003C/html\u003E\n\n--- server output ---\n$ vite\r\n\u001B[2m6:05:28 p. m.\u001B[22m \u001B[36m\u001B[1m[vite]\u001B[22m\u001B[39m \u001B[90m\u001B[2m(client)\u001B[22m\u001B[39m Re-optimizing dependencies because lockfile has changed\r\n\r\n  \u001B[32m\u001B[1mVITE\u001B[22m v8.0.5\u001B[39m  \u001B[2mready in \u001B[0m\u001B[1m434\u001B[22m\u001B[2m\u001B[0m ms\u001B[22m\r\n\r\n  \u001B[32m\u279C\u001B[39m  \u001B[1mLocal\u001B[22m:   \u001B[36mhttp://127.0.0.1:\u001B[1m8445\u001B[22m/\u001B[39m\r\n",
+        "durationMs": 1054
+      },
+      {
+        "name": "tests-pass",
+        "kind": "process",
+        "verificationMethod": "test-results",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "$ vitest run\r\n\r\n RUN  v5.0.5 C:/Users/ASUS/Desktop/BS/Frontend\r\n\r\n\r\n Test Files  1 passed (1)\r\n      Tests  1 passed (1)\r\n   Start at  18:05:29\r\n   Duration  190ms (import 44%, transform 26%, worker 16%, tests 14%, environment 1%)\r\n\r\n",
+        "durationMs": 897,
+        "testResults": {
+          "testFramework": "vitest",
+          "runnerDetectedFrom": "package_json",
+          "testsTotal": 1,
+          "testsPassed": 1,
+          "testsFailed": 0,
+          "testsSkipped": 0,
+          "parseFailed": false
+        }
+      }
+    ],
+    "executions": [
+      {
+        "source": "setup[0]",
+        "resolvedExecutable": "C:\\Users\\ASUS\\AppData\\Roaming\\npm\\pnpm.CMD",
+        "args": [
+          "install",
+          "--frozen-lockfile"
+        ],
+        "cwd": "C:\\Users\\ASUS\\Desktop\\BS\\Frontend",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "tsc-no-emit",
+        "resolvedExecutable": "C:\\Users\\ASUS\\AppData\\Roaming\\npm\\pnpm.CMD",
+        "args": [
+          "exec",
+          "tsc",
+          "--noEmit"
+        ],
+        "cwd": "C:\\Users\\ASUS\\Desktop\\BS\\Frontend",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "production-build",
+        "resolvedExecutable": "C:\\Users\\ASUS\\AppData\\Roaming\\npm\\pnpm.CMD",
+        "args": [
+          "run",
+          "build"
+        ],
+        "cwd": "C:\\Users\\ASUS\\Desktop\\BS\\Frontend",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "dev-server-serves-home",
+        "resolvedExecutable": "C:\\Users\\ASUS\\AppData\\Roaming\\npm\\pnpm.CMD",
+        "args": [
+          "run",
+          "dev"
+        ],
+        "cwd": "C:\\Users\\ASUS\\Desktop\\BS\\Frontend",
+        "env": {
+          "PORT": "8445",
+          "FIGMA_DEV_SERVER_HOST": "127.0.0.1"
+        },
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "tests-pass",
+        "resolvedExecutable": "C:\\Users\\ASUS\\AppData\\Roaming\\npm\\pnpm.CMD",
+        "args": [
+          "test"
+        ],
+        "cwd": "C:\\Users\\ASUS\\Desktop\\BS\\Frontend",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      }
+    ]
+  }
+}
