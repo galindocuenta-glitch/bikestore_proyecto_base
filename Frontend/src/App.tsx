@@ -1809,110 +1809,6 @@ function CookiesModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-const PRIVACY_CONSENT_KEY = 'bs-bikestore-privacy-consent-v1'
-
-function PrivacyConsentGate({
-  onAccept,
-  onOpenTerms,
-  onOpenPrivacy,
-}: {
-  onAccept: () => void
-  onOpenTerms: () => void
-  onOpenPrivacy: () => void
-}) {
-  const [confirmed, setConfirmed] = useState(false)
-
-  useEffect(() => {
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
-  }, [])
-
-  return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#1A1A1A]/80 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="privacy-consent-title"
-      aria-describedby="privacy-consent-description"
-    >
-      <div className="modal-animate w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="bg-black px-6 py-5 sm:px-8">
-          <div className="flex items-center gap-4">
-            <BSLogo size={52} />
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-gray-100">Bicicenter Bikestore</p>
-              <h2 id="privacy-consent-title" className="font-display mt-1 text-xl font-black text-gray-100 sm:text-2xl">
-                Tu privacidad es importante
-              </h2>
-            </div>
-          </div>
-        </div>
-
-        <div className="px-6 py-6 sm:px-8">
-          <p id="privacy-consent-description" className="text-sm leading-relaxed text-gray-600">
-            Antes de ingresar, queremos informarte cómo usamos y protegemos tus datos personales al navegar,
-            crear una cuenta o realizar un pedido.
-          </p>
-
-          <div className="my-5 space-y-3 rounded-xl border border-gray-100 bg-[#F4F4F5] p-4">
-            {[
-              'Usamos tus datos para gestionar pedidos, entregas, soporte y facturación.',
-              'Protegemos tu información y no la vendemos a terceros.',
-              'Puedes consultar, actualizar o solicitar la eliminación de tus datos.',
-            ].map((item) => (
-              <div key={item} className="flex gap-3">
-                <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-[#0D5C3A] text-white" aria-hidden="true">
-                  <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
-                    <path d="m5 12 4 4L19 6" />
-                  </svg>
-                </span>
-                <p className="text-sm leading-relaxed text-gray-700">{item}</p>
-              </div>
-            ))}
-          </div>
-
-          <p className="text-sm leading-relaxed text-gray-600">
-            Revisa nuestros{' '}
-            <button type="button" onClick={onOpenTerms} className="font-bold text-[#0D5C3A] underline underline-offset-2 hover:text-[#1A8A5A]">
-              Términos y Condiciones
-            </button>{' '}
-            y la{' '}
-            <button type="button" onClick={onOpenPrivacy} className="font-bold text-[#0D5C3A] underline underline-offset-2 hover:text-[#1A8A5A]">
-              Política de Privacidad
-            </button>
-            .
-          </p>
-
-          <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-4 transition-colors hover:border-[#0D5C3A]/40">
-            <input
-              type="checkbox"
-              checked={confirmed}
-              onChange={(event) => setConfirmed(event.target.checked)}
-              className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#0D5C3A]"
-            />
-            <span className="text-sm font-medium leading-relaxed text-gray-700">
-              He leído y acepto los Términos y Condiciones y la Política de Privacidad.
-            </span>
-          </label>
-
-          <button
-            type="button"
-            disabled={!confirmed}
-            onClick={onAccept}
-            className="mt-5 w-full rounded-full bg-[#0D5C3A] px-6 py-3.5 text-sm font-black text-white transition-all hover:bg-[#1A8A5A] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Aceptar y entrar
-          </button>
-
-          <p className="mt-3 text-center text-xs leading-relaxed text-gray-400">
-            Debes aceptar para acceder a la tienda.
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ─── Checkout ─────────────────────────────────────────────────────────────────
 
 type PayMethod = 'efectivo'
@@ -4307,13 +4203,6 @@ export default function App() {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [legalModal, setLegalModal] = useState<'terminos' | 'privacidad' | 'cookies' | null>(null)
-  const [privacyConsentAccepted, setPrivacyConsentAccepted] = useState(() => {
-    try {
-      return window.localStorage.getItem(PRIVACY_CONSENT_KEY) === 'accepted'
-    } catch {
-      return false
-    }
-  })
   const [darkMode, setDarkMode] = useState(false)
   const [userReviews, setUserReviews] = useState<{ name: string; date: string; rating: number; bike: string; comment: string }[]>([])
   const searchRef = useRef<HTMLInputElement>(null)
@@ -4439,25 +4328,8 @@ export default function App() {
     setTimeout(() => searchRef.current?.focus(), 100)
   }
 
-  const acceptPrivacyConsent = () => {
-    try {
-      window.localStorage.setItem(PRIVACY_CONSENT_KEY, 'accepted')
-    } catch {
-      // Allow access even when browser storage is unavailable.
-    }
-    setPrivacyConsentAccepted(true)
-  }
-
   return (
     <div className={`min-h-screen bg-white dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200`}>
-      {!privacyConsentAccepted && (
-        <PrivacyConsentGate
-          onAccept={acceptPrivacyConsent}
-          onOpenTerms={() => setLegalModal('terminos')}
-          onOpenPrivacy={() => setLegalModal('privacidad')}
-        />
-      )}
-
       {/* ─── NAV ─────────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-30 bg-white border-b border-gray-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
