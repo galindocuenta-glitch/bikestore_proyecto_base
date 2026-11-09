@@ -625,6 +625,56 @@ table.admin-appointments-table thead th {
 .dark .hover\:shadow-2xl:hover { box-shadow: var(--card-shadow) !important; }
 .dark .bg-\[\#0D5C3A\]\/5 { background-color: rgba(16, 185, 129, 0.08) !important; }
 
+@media (max-width: 640px) {
+  body { overflow-x: clip; }
+
+  #store-header .site-header-actions { gap: 0.125rem; }
+  #store-header .site-header-actions > button,
+  #store-header .site-user-menu-button {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+  #store-header .site-user-menu-button { justify-content: center; padding: 0; }
+
+  .catalog-section .catalog-card__content { padding: 1rem; }
+  .catalog-card__purchase { align-items: stretch; flex-direction: column; }
+  .catalog-card__add-button { width: 100%; min-height: 3rem; white-space: normal; }
+  .catalog-sort { width: 100%; margin-left: 0; justify-content: space-between; }
+  .catalog-sort select { max-width: 62%; }
+  .catalog-price-filters { align-items: stretch; }
+  .catalog-price-filters > span:first-child { width: 100%; }
+  .catalog-price-filters > div { width: 100%; }
+  .catalog-price-filters input { width: auto; min-width: 0; flex: 1; }
+
+  .bike-chat-widget {
+    right: max(0.75rem, env(safe-area-inset-right));
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+  .bike-chat-widget__action {
+    max-width: calc(100vw - 5rem);
+    min-height: 3rem;
+    padding-inline: 1rem;
+    font-size: 0.875rem;
+  }
+  .bike-chat-window { max-height: calc(100dvh - 5rem); }
+}
+
+@media (max-width: 360px) {
+  #store-header > div { padding-inline: 0.75rem; }
+  #store-header > div > div:first-child > button img {
+    width: 2.75rem !important;
+    height: 2.75rem !important;
+  }
+  #store-header .site-header-actions > button,
+  #store-header .site-user-menu-button {
+    width: 2.5rem;
+    min-width: 2.5rem;
+    height: 2.5rem;
+    min-height: 2.5rem;
+  }
+  #store-header .site-header-theme { display: none; }
+}
+
 .admin-order-status {
   display: inline-flex;
   align-items: center;

@@ -73,6 +73,14 @@ API REST para el catálogo, las cuentas, los pedidos y las reseñas de BS Bike S
 
    Una instalación nueva desde `SQL/schema.sql` ya incluye `user_wishlist`; cada usuario solo puede consultar y modificar su propia lista.
 
+   Para habilitar el carrito por cuenta en una base existente:
+
+   ```sh
+   mysql -u root -p < SQL/20261109_cart_items.sql
+   ```
+
+   Una instalación nueva desde `SQL/schema.sql` también incluye `cart_items`. Los permisos del usuario de ejecución deben permitir `DELETE` en esa tabla.
+
 2. En `Backend/`, instalar dependencias y crear la configuración local:
 
    ```sh
@@ -80,7 +88,7 @@ API REST para el catálogo, las cuentas, los pedidos y las reseñas de BS Bike S
    cp .env.example .env
    ```
 
-3. Completar las credenciales MySQL, `JWT_SECRET` (mínimo 32 caracteres) y `FRONTEND_ORIGIN=http://localhost:8443`.
+3. Completar las credenciales MySQL, `JWT_SECRET` (mínimo 32 caracteres) y `FRONTEND_ORIGIN=http://localhost:8443`. En desarrollo, la API también permite orígenes HTTP de la red privada (`10.x.x.x`, `172.16–31.x.x` y `192.168.x.x`) para acceder desde otros dispositivos; en producción solo se permiten los orígenes HTTPS enumerados en `FRONTEND_ORIGIN`, separados por comas.
    En producción, no usar `root`: crea un usuario exclusivo para la aplicación con permisos mínimos y habilita TLS para MySQL (`DB_SSL=true`). Por ejemplo, desde una sesión administrativa de MySQL, reemplaza la contraseña por una secreta y adapta el host a donde corre la API:
 
    ```sql
@@ -88,10 +96,12 @@ API REST para el catálogo, las cuentas, los pedidos y las reseñas de BS Bike S
    GRANT SELECT, INSERT, UPDATE ON bs_bike_store.* TO 'bs_app'@'localhost';
    GRANT DELETE ON bs_bike_store.offer_products TO 'bs_app'@'localhost';
    GRANT DELETE ON bs_bike_store.user_wishlist TO 'bs_app'@'localhost';
+   GRANT DELETE ON bs_bike_store.cart_items TO 'bs_app'@'localhost';
    ```
 
    Usa ese usuario y clave en `DB_USER` y `DB_PASSWORD`. Mantén las migraciones y tareas administrativas de esquema en una cuenta DBA separada; no concedas `CREATE`, `ALTER`, `DROP` ni `GRANT` al usuario de ejecución. En producción, la API rechaza `root`, contraseña vacía o conexiones sin `DB_SSL=true` y valida los certificados TLS de MySQL.
    Seguridad web en producción: publica el frontend y la API solo detrás de HTTPS. La API entrega JWT exclusivamente en cookie `HttpOnly`, `SameSite=Lax` y `Secure` en producción; las operaciones que modifican datos requieren un `Origin` de confianza y CORS admite credenciales solo desde `FRONTEND_ORIGIN`. El frontend aplica Content Security Policy y cabeceras anti-clickjacking, MIME sniffing y control de permisos en Vite dev/preview; si se sirve el build desde otro hosting, configura esas mismas cabeceras en el servidor o CDN. Conserva `helmet` en la API y limita `FRONTEND_ORIGIN` a los dominios HTTPS de confianza. Mantén MySQL en una red privada, no expongas el puerto 3306 a Internet y conserva copias cifradas con pruebas periódicas de restauración.
+   La autenticación utiliza JWT propio en cookie; no utiliza Firebase Auth ni requiere configurar Firebase Authorized Domains.
 4. Importar el catálogo inicial. Conserva el stock actual si un producto ya existe:
 
    ```sh
@@ -124,6 +134,7 @@ Al confirmar el checkout se registra el pedido como `processing` (confirmado y e
 - `GET /api/products/:id` y `GET /api/products/:id/reviews`, `GET /api/reviews?limit=50`
 - `POST /api/auth/register` (requiere `termsAccepted: true`), `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout`
 - `POST /api/chat/message`, `GET /api/chat/history/:sessionId` y `POST /api/chat/escalation`; cada conversación usa un UUID persistido y el historial de una cuenta autenticada solo lo puede leer esa cuenta.
+- Carrito de cliente: `GET /api/cart/:userId`, `POST /api/cart` (sincroniza los ítems recibidos como conjunto) y `DELETE /api/cart/:userId/:productId`; solo se permite operar sobre el usuario autenticado.
 - `POST /api/orders`, `GET /api/orders/mine`
 - `POST /api/appointments` (agendamiento público, con límite de solicitudes); requiere teléfono numérico y una fecha futura.
 - `GET /api/orders/:id` (el cliente solo puede consultar sus propios pedidos)
@@ -132,6 +143,7 @@ Al confirmar el checkout se registra el pedido como `processing` (confirmado y e
 - Ofertas persistentes: `GET/POST /api/admin/offers`, `PATCH /api/admin/offers/:id`, `PATCH /api/admin/offers/:id/active` y `DELETE /api/admin/offers/:id` (archivo lógico, sin borrar historial); cada oferta debe asociarse a uno o más productos.
 - Reseñas habilitables/deshabilitables: `GET /api/admin/reviews?approved=false|true` y `PATCH /api/admin/reviews/:id/approval`.
 - Citas de taller (administrador): `GET /api/admin/appointments` y `PATCH /api/admin/appointments/:id/status`; estados `pending`, `in_progress`, `completed` y `cancelled`.
+- Historial de compras por cliente (administrador): `GET /api/admin/customers/:userId/orders`.
 - Administración con token Bearer y rol `admin`: `GET /api/admin/products`, `POST/PATCH /api/products`, `GET/POST /api/admin/clients`, `PATCH /api/admin/clients/:id/active`, `GET /api/orders`, `PATCH /api/orders/:id/status`, `GET /api/admin/reviews?approved=false` y `PATCH /api/admin/reviews/:id/approval`
 
 Para las rutas protegidas, enviar `Authorization: Bearer <token>`. Los estados de pedido aceptados por administración son `processing`, `shipped`, `delivered` y `cancelled`.

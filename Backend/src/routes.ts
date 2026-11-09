@@ -64,6 +64,16 @@ const wishlistSchema = z.object({
   action: z.enum(['toggle', 'add']).default('toggle'),
 })
 
+const cartSyncSchema = z.object({
+  items: z.array(z.object({
+    productId: z.number().int().positive(),
+    quantity: z.number().int().min(1).max(20),
+  })).max(50).refine(
+    (items) => new Set(items.map((item) => item.productId)).size === items.length,
+    'No se permiten productos duplicados en el carrito.',
+  ),
+})
+
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-7', legacyHeaders: false })
 const reviewLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 5, standardHeaders: 'draft-7', legacyHeaders: false })
 const appointmentLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 10, standardHeaders: 'draft-7', legacyHeaders: false })
@@ -368,6 +378,50 @@ router.post('/auth/logout', (_req, res) => {
   res.status(204).end()
 })
 
+router.get('/cart/:userId', requireAuth, asyncRoute(async (req, res) => {
+  const userId = z.coerce.number().int().positive().parse(req.params.userId)
+  if (req.user!.role !== 'client' || userId !== req.user!.id) throw new HttpError(403, 'No tienes acceso a este carrito.')
+  const [items] = await pool.execute<RowDataPacket[]>(
+    `SELECT p.id, p.name, p.category, p.price, p.image_url AS img, ci.quantity AS qty
+     FROM cart_items ci JOIN products p ON p.id = ci.product_id
+     WHERE ci.user_id = ? ORDER BY ci.updated_at, ci.id`,
+    [req.user!.id],
+  )
+  res.json({ items })
+}))
+
+router.post('/cart', requireAuth, asyncRoute(async (req, res) => {
+  if (req.user!.role !== 'client') throw new HttpError(403, 'Solo los clientes pueden guardar un carrito.')
+  const { items } = cartSyncSchema.parse(req.body)
+  const connection = await pool.getConnection()
+  try {
+    await connection.beginTransaction()
+    await connection.execute('DELETE FROM cart_items WHERE user_id = ?', [req.user!.id])
+    for (const item of items) {
+      const [result] = await connection.execute<ResultSetHeader>(
+        'INSERT INTO cart_items (user_id, product_id, quantity) SELECT ?, id, ? FROM products WHERE id = ?',
+        [req.user!.id, item.quantity, item.productId],
+      )
+      if (!result.affectedRows) throw new HttpError(400, `No encontramos el producto ${item.productId}.`)
+    }
+    await connection.commit()
+    res.json({ ok: true })
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
+}))
+
+router.delete('/cart/:userId/:productId', requireAuth, asyncRoute(async (req, res) => {
+  const userId = z.coerce.number().int().positive().parse(req.params.userId)
+  const productId = z.coerce.number().int().positive().parse(req.params.productId)
+  if (req.user!.role !== 'client' || userId !== req.user!.id) throw new HttpError(403, 'No tienes acceso a este carrito.')
+  await pool.execute('DELETE FROM cart_items WHERE user_id = ? AND product_id = ?', [req.user!.id, productId])
+  res.status(204).end()
+}))
+
 router.get('/wishlist/:userId', requireAuth, asyncRoute(async (req, res) => {
   const userId = z.coerce.number().int().positive().parse(req.params.userId)
   const sessionUser = req.user
@@ -547,6 +601,42 @@ router.get('/admin/clients', requireAuth, requireAdmin, asyncRoute(async (_req, 
      ORDER BY u.created_at DESC LIMIT 500`,
   )
   res.json({ items: clients })
+}))
+
+router.get('/admin/customers/:userId/orders', requireAuth, requireAdmin, asyncRoute(async (req, res) => {
+  const userId = z.coerce.number().int().positive().parse(req.params.userId)
+  const [customers] = await pool.execute<RowDataPacket[]>(
+    "SELECT id FROM users WHERE id = ? AND role = 'client' LIMIT 1",
+    [userId],
+  )
+  if (!customers.length) throw new HttpError(404, 'No encontramos ese cliente.')
+  const [orders] = await pool.execute<RowDataPacket[]>(
+    `SELECT u.id AS userId, o.id, o.status, o.total, o.created_at AS createdAt,
+      JSON_ARRAYAGG(JSON_OBJECT(
+        'productId', oi.product_id,
+        'name', COALESCE(p.name, oi.product_name),
+        'quantity', oi.quantity,
+        'unitPrice', oi.unit_price
+      )) AS items
+     FROM users u
+     JOIN orders o ON o.user_id = u.id
+     JOIN order_items oi ON oi.order_id = o.id
+     LEFT JOIN products p ON p.id = oi.product_id
+     WHERE u.id = ?
+     GROUP BY u.id, o.id, o.status, o.total, o.created_at
+     ORDER BY o.created_at DESC`,
+    [userId],
+  )
+  res.json({
+    items: orders.map((order) => ({
+      ...order,
+      userId: Number(order.userId),
+      id: Number(order.id),
+      total: Number(order.total),
+      createdAt: new Date(order.createdAt as string | Date).toISOString(),
+      items: typeof order.items === 'string' ? JSON.parse(order.items) : order.items,
+    })),
+  })
 }))
 
 router.get('/admin/dashboard', requireAuth, requireAdmin, asyncRoute(async (req, res) => {
@@ -919,6 +1009,7 @@ router.post('/orders', requireAuth, asyncRoute(async (req, res) => {
       'INSERT INTO invoices (order_id, invoice_number, subtotal, tax_rate, tax_amount, total, payment_method, payment_point, payment_status, billing_name, billing_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [orderResult.insertId, invoiceNumber, subtotal, taxRate, taxAmount, total, input.paymentMethod, input.paymentPoint, 'pending', req.user!.name, req.user!.email],
     )
+    await connection.execute('DELETE FROM cart_items WHERE user_id = ?', [req.user!.id])
     await connection.commit()
     res.status(201).json({
       id: orderResult.insertId,

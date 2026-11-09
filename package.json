@@ -1,0 +1,23 @@
+{
+  "name": "bikestore_proyecto_base",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/galindocuenta-glitch/bikestore_proyecto_base.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/galindocuenta-glitch/bikestore_proyecto_base/issues"
+  },
+  "homepage": "https://github.com/galindocuenta-glitch/bikestore_proyecto_base#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.65.0",
+    "@types/node": "^26.6.6"
+  }
+}

@@ -38,6 +38,25 @@ export const BIKE_IMAGE_LIBRARY = {
   ],
 } as const
 
+export const bikeMediaLibrary = {
+  mtb: BIKE_IMAGE_LIBRARY.mountain,
+  ruta: BIKE_IMAGE_LIBRARY.road,
+  urbana: BIKE_IMAGE_LIBRARY.urban,
+  electrica: BIKE_IMAGE_LIBRARY.electric,
+  infantil: BIKE_IMAGE_LIBRARY.kids,
+  repuestos: [
+    { id: 'rep-1', nombre: 'Transmisión y Desviador', url: unsplash('1662990472483-e18e8d479134') },
+    { id: 'rep-2', nombre: 'Disco de Freno y Cassette', url: unsplash('1715942475017-d779a5fa4830') },
+    { id: 'rep-3', nombre: 'Rines y Cubiertas', url: unsplash('1532298229144-0ec0c57515c7') },
+    { id: 'rep-4', nombre: 'Plato y Cadena MTB', url: unsplash('1576435728678-68d0fbf94e91') },
+  ],
+  accesorios: [
+    { id: 'acc-1', nombre: 'Casco de Ruta / Aero', url: unsplash('1605051972583-9b09d3b4b5c7') },
+    { id: 'acc-2', nombre: 'Guantes y Gafas de Ciclismo', url: unsplash('1640244795325-1e3df6a1b26c') },
+    { id: 'acc-3', nombre: 'Herramientas y Mantenimiento', url: unsplash('1485965120184-e220f721d03e') },
+  ],
+} as const
+
 const partImage = (photoId: string, width = 600) => unsplash(photoId, width)
 
 export const PART_IMAGE_LIBRARY = {
@@ -86,9 +105,12 @@ const bikeFallbacks: Record<string, string> = {
   ruta: roadBikeFallback,
   urbana: bikeFallback,
   'ciudad y paseo': bikeFallback,
+  urbana: bikeFallback,
   eléctrica: electricBikeFallback,
   electrica: electricBikeFallback,
   infantil: kidsBikeFallback,
+  repuestos: bikeFallback,
+  accesorios: bikeFallback,
 }
 
 const partFallbacks: Record<string, string> = {
@@ -105,11 +127,13 @@ const partFallbacks: Record<string, string> = {
 
 export function getBikeCategoryImage(category: string | null | undefined): string {
   const normalized = (category ?? '').trim().toLocaleLowerCase('es')
-  if (normalized.includes('ruta')) return BIKE_IMAGE_LIBRARY.road[0]
-  if (normalized.includes('eléctr') || normalized.includes('electric')) return BIKE_IMAGE_LIBRARY.electric[0]
-  if (normalized.includes('infantil') || normalized.includes('niñ')) return BIKE_IMAGE_LIBRARY.kids[0]
-  if (normalized.includes('urb')) return BIKE_IMAGE_LIBRARY.urban[0]
-  return BIKE_IMAGE_LIBRARY.mountain[0]
+  if (normalized.includes('repuesto')) return bikeMediaLibrary.repuestos[0].url
+  if (normalized.includes('accesorio')) return bikeMediaLibrary.accesorios[0].url
+  if (normalized.includes('ruta')) return bikeMediaLibrary.ruta[0]
+  if (normalized.includes('eléctr') || normalized.includes('electric')) return bikeMediaLibrary.electrica[0]
+  if (normalized.includes('infantil') || normalized.includes('niñ')) return bikeMediaLibrary.infantil[0]
+  if (normalized.includes('urb')) return bikeMediaLibrary.urbana[0]
+  return bikeMediaLibrary.mtb[0]
 }
 
 export function getBikeImageFallback(category: string | null | undefined): string {

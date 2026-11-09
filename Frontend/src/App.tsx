@@ -171,6 +171,14 @@ interface CustomerOrder {
   items: { productId: number | null; name: string; unitPrice: number; quantity: number }[]
 }
 
+interface AdminClientOrder {
+  id: number
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
+  total: number
+  createdAt: string
+  items: { productId: number | null; name: string; unitPrice: number; quantity: number }[]
+}
+
 // ─── Data ────────────────────────────────────────────────────────────────────
 
 const NAV_LINKS = [
@@ -614,7 +622,8 @@ const ALL_PRODUCTS: Product[] = [
   },
 ]
 
-const CATEGORIES = ['Todas', 'Todo Terreno', 'Eléctrica', 'Ruta', 'Infantil']
+const CATEGORIES = ['Todas', 'Todo Terreno', 'Ruta', 'Urbana', 'Eléctrica', 'Infantil']
+const ADMIN_PRODUCT_CATEGORIES = [...CATEGORIES.slice(1), 'Repuestos', 'Accesorios']
 
 const COLOMBIA_DEPTS: Record<string, string[]> = {
   'Amazonas': ['Leticia','Puerto Nariño'],
@@ -1862,7 +1871,7 @@ function FloatingChatWidget({ user }: { user: AuthUser | null }) {
   if (isDismissed) return null
 
   return (
-    <div className="fixed bottom-4 right-4 z-[130] flex flex-col items-end gap-3">
+    <div className="bike-chat-widget fixed bottom-4 right-4 z-[130] flex flex-col items-end gap-3">
       {isOpen && (
         <section
           aria-label="Chat de asesoría Bike Store"
@@ -1959,7 +1968,7 @@ function FloatingChatWidget({ user }: { user: AuthUser | null }) {
           aria-label={isOpen ? 'Cerrar asesoría' : 'Solicitar asesoría'}
           aria-expanded={isOpen}
           onClick={() => setIsOpen((open) => !open)}
-          className="flex items-center gap-2 rounded-full bg-[#0D5C3A] px-5 py-3.5 font-bold text-white shadow-xl transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#1A8A5A] hover:shadow-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0D5C3A]"
+          className="bike-chat-widget__action flex min-h-12 items-center gap-2 rounded-full bg-[#0D5C3A] px-5 py-3.5 font-bold text-white shadow-xl transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#1A8A5A] hover:shadow-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0D5C3A]"
         >
           <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z" />
@@ -1971,7 +1980,7 @@ function FloatingChatWidget({ user }: { user: AuthUser | null }) {
           aria-label="Ocultar el asistente de chat"
           title="Ocultar el asistente"
           onClick={() => setIsDismissed(true)}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-gray-600 shadow-lg transition-colors hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0D5C3A]"
+          className="bike-chat-widget__dismiss flex h-11 w-11 items-center justify-center rounded-full bg-white text-gray-600 shadow-lg transition-colors hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0D5C3A]"
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
             <path d="m18 6-12 12M6 6l12 12" />
@@ -3582,6 +3591,10 @@ function AdminPanel({
   const [clients, setClients] = useState<AdminClient[]>(INIT_CLIENTS)
   const [clientSearch, setClientSearch] = useState('')
   const [showAddClient, setShowAddClient] = useState(false)
+  const [selectedClient, setSelectedClient] = useState<AdminClient | null>(null)
+  const [clientOrders, setClientOrders] = useState<AdminClientOrder[]>([])
+  const [clientOrdersLoading, setClientOrdersLoading] = useState(false)
+  const [clientOrdersError, setClientOrdersError] = useState('')
   const [newClient, setNewClient] = useState({ name: '', email: '', phone: '', password: '', termsAccepted: false })
   useEffect(() => {
     void apiRequest<{ items: AdminClient[] }>('/admin/clients')
@@ -3593,6 +3606,20 @@ function AdminPanel({
       }))))
       .catch((error: unknown) => window.alert(error instanceof Error ? error.message : 'No fue posible cargar los clientes.'))
   }, [])
+  const openClientOrders = async (client: AdminClient) => {
+    setSelectedClient(client)
+    setClientOrders([])
+    setClientOrdersError('')
+    setClientOrdersLoading(true)
+    try {
+      const { items } = await apiRequest<{ items: AdminClientOrder[] }>(`/admin/customers/${client.id}/orders`)
+      setClientOrders(items)
+    } catch (error) {
+      setClientOrdersError(error instanceof Error ? error.message : 'No fue posible cargar el historial del cliente.')
+    } finally {
+      setClientOrdersLoading(false)
+    }
+  }
 
   // Offers state
   const [offers, setOffers] = useState<AdminOffer[]>([])
@@ -3707,7 +3734,7 @@ function AdminPanel({
       category: newProduct.category,
       price,
       stock,
-      ...(newProduct.imgPreview ? { imageUrl: newProduct.imgPreview } : {}),
+      imageUrl: newProduct.imgPreview || getBikeCategoryImage(newProduct.category),
     }
     setSavingProduct(true)
     try {
@@ -3727,7 +3754,7 @@ function AdminPanel({
           category: payload.category,
           price: payload.price,
           stock: payload.stock,
-          img: newProduct.imgPreview || MTN,
+          img: payload.imageUrl,
           active: true,
         }])
       }
@@ -3800,7 +3827,7 @@ function AdminPanel({
 
   const openEditProduct = (p: AdminProduct) => {
     setEditProduct(p)
-    setNewProduct({ name: p.name, category: p.category, price: String(p.price), stock: String(p.stock), imgPreview: '' })
+    setNewProduct({ name: p.name, category: p.category, price: String(p.price), stock: String(p.stock), imgPreview: p.img })
     setShowAddProduct(true)
   }
 
@@ -4223,7 +4250,13 @@ function AdminPanel({
                     {getAdminPage('dashboard-stock', criticalStockProducts).items.map((p) => (
                       <div key={p.id} className="flex items-center gap-3">
                         <div className="product-thumbnail">
-                          <img src={p.img} alt={p.name} className="product-thumbnail-image" />
+                          <img
+                            src={p.img || getBikeCategoryImage(p.category)}
+                            alt={p.name}
+                            className="product-thumbnail-image"
+                            loading="lazy"
+                            onError={(event) => handleImageFallback(event, getBikeImageFallback(p.category))}
+                          />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-[#1A1A1A] truncate">{p.name}</p>
@@ -4405,8 +4438,8 @@ function AdminPanel({
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Categoría</label>
-                      <select className={inputCls} value={newProduct.category} onChange={(e) => setNewProduct((p) => ({ ...p, category: e.target.value }))}>
-                        {CATEGORIES.filter(c=>c!=='Todas').map(c=><option key={c}>{c}</option>)}
+                      <select className={inputCls} value={newProduct.category} onChange={(e) => setNewProduct((p) => ({ ...p, category: e.target.value, imgPreview: getBikeCategoryImage(e.target.value) }))}>
+                        {ADMIN_PRODUCT_CATEGORIES.map(c=><option key={c}>{c}</option>)}
                       </select>
                     </div>
                     <div>
@@ -4423,9 +4456,17 @@ function AdminPanel({
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8 text-gray-400">
                           <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
                         </svg>
-                        {newProduct.imgPreview || editProduct?.img
-                          ? <img src={newProduct.imgPreview || editProduct?.img} alt="preview" className="h-16 w-16 object-contain rounded-lg" />
-                          : <span className="text-sm text-gray-400">Subir foto (JPG, PNG, WebP)</span>}
+                        <img
+                          src={newProduct.imgPreview || editProduct?.img || getBikeCategoryImage(newProduct.category)}
+                          alt={`Vista previa de ${newProduct.category}`}
+                          onError={(event) => {
+                            const fallback = getBikeImageFallback(newProduct.category)
+                            handleImageFallback(event, fallback)
+                            setNewProduct((product) => ({ ...product, imgPreview: fallback }))
+                          }}
+                          className="h-16 w-16 rounded-lg object-cover"
+                        />
+                        <span className="text-sm text-gray-500">Imagen sugerida por categoría · pulsa para subir otra</span>
                         <input type="file" accept="image/*" className="hidden" onChange={handleImgUpload} />
                       </label>
                     </div>
@@ -4437,8 +4478,8 @@ function AdminPanel({
                 </div>
               )}
 
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
+                <table className="min-w-[700px] w-full text-sm">
                   <thead className="bg-[#F4F4F5]">
                     <tr>
                       {['Producto', 'Categoría', 'Precio', 'Stock', 'Estado', 'Acciones'].map(h=>(
@@ -4822,7 +4863,7 @@ function AdminPanel({
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full bg-[#1A8A5A]/10 flex items-center justify-center text-[#0D5C3A] font-black text-sm">{c.name[0]}</div>
-                            <span className="font-semibold text-[#1A1A1A]">{c.name}</span>
+                            <button onClick={() => void openClientOrders(c)} className="font-semibold text-[#1A1A1A] hover:text-[#0D5C3A] hover:underline text-left">{c.name}</button>
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -4849,6 +4890,42 @@ function AdminPanel({
                   onChange={(page) => setAdminPage('clients', page)}
                 />
               </div>
+              {selectedClient && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="client-orders-title">
+                  <div className="w-full max-w-4xl max-h-[85vh] overflow-auto rounded-2xl bg-white p-5 shadow-2xl">
+                    <div className="mb-5 flex items-start justify-between gap-4">
+                      <div>
+                        <h3 id="client-orders-title" className="text-lg font-black">Historial de compras</h3>
+                        <p className="text-sm text-gray-500">{selectedClient.name} · {selectedClient.email}</p>
+                      </div>
+                      <button onClick={() => setSelectedClient(null)} className={btnOutline} aria-label="Cerrar historial">Cerrar</button>
+                    </div>
+                    {clientOrdersLoading ? <p className="py-8 text-center text-sm text-gray-500">Cargando pedidos...</p>
+                      : clientOrdersError ? <p role="alert" className="py-8 text-center text-sm text-red-600">{clientOrdersError}</p>
+                        : clientOrders.length === 0 ? <p className="py-8 text-center text-sm text-gray-500">Este cliente aún no tiene pedidos.</p>
+                          : (
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm">
+                                <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                                  <tr>{['Pedido', 'Fecha', 'Productos', 'Total', 'Estado'].map((heading) => <th key={heading} className="px-3 py-2">{heading}</th>)}</tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {clientOrders.map((order) => (
+                                    <tr key={order.id}>
+                                      <td className="px-3 py-3 font-mono">#{order.id}</td>
+                                      <td className="px-3 py-3">{new Date(order.createdAt).toLocaleDateString('es-CO')}</td>
+                                      <td className="px-3 py-3">{order.items.map((item) => `${item.name} × ${item.quantity}`).join(', ')}</td>
+                                      <td className="px-3 py-3 font-bold">${order.total.toLocaleString('es-CO')}</td>
+                                      <td className="px-3 py-3 capitalize">{({ pending: 'Pendiente', processing: 'En proceso', shipped: 'Enviado', delivered: 'Entregado', cancelled: 'Cancelado' })[order.status]}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -5259,7 +5336,46 @@ function getSavedThemePreference(): boolean {
   }
 }
 
+const CART_STORAGE_KEY = 'bs-bike-store-cart'
 const WISHLIST_STORAGE_KEY = 'bs-bike-store-wishlist'
+
+function getSavedCart(): CartItem[] {
+  try {
+    const saved = window.localStorage.getItem(CART_STORAGE_KEY)
+    if (!saved) return []
+    const parsed: unknown = JSON.parse(saved)
+    if (!Array.isArray(parsed)) throw new Error('El formato guardado no es una lista.')
+    return parsed.filter((item): item is CartItem => {
+      if (typeof item !== 'object' || item === null) return false
+      const cartItem = item as Record<string, unknown>
+      return Number.isSafeInteger(cartItem.id) && Number(cartItem.id) > 0
+        && typeof cartItem.name === 'string'
+        && typeof cartItem.price === 'number' && Number.isFinite(cartItem.price) && cartItem.price >= 0
+        && typeof cartItem.priceLabel === 'string'
+        && typeof cartItem.img === 'string'
+        && Number.isSafeInteger(cartItem.qty) && Number(cartItem.qty) > 0
+    })
+  } catch (error) {
+    console.warn('No fue posible leer el carrito guardado.', error)
+    return []
+  }
+}
+
+function saveCart(items: CartItem[]): void {
+  try {
+    window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items))
+  } catch (error) {
+    console.warn('No fue posible guardar el carrito local.', error)
+  }
+}
+
+function clearSavedCart(): void {
+  try {
+    window.localStorage.removeItem(CART_STORAGE_KEY)
+  } catch (error) {
+    console.warn('No fue posible limpiar el carrito local sincronizado.', error)
+  }
+}
 
 function getSavedWishlist(): number[] {
   try {
@@ -5305,7 +5421,7 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [cartOpen, setCartOpen] = useState(false)
   const [wishlistOpen, setWishlistOpen] = useState(false)
-  const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const [cartItems, setCartItems] = useState<CartItem[]>(getSavedCart)
   const [storeProducts, setStoreProducts] = useState<Product[]>(ALL_PRODUCTS)
   const [wishlist, setWishlist] = useState<number[]>(getSavedWishlist)
   const [wishlistProducts, setWishlistProducts] = useState<Product[]>([])
@@ -5332,6 +5448,8 @@ export default function App() {
   const headerRef = useRef<HTMLElement>(null)
   const transitionTimeoutRef = useRef<number | null>(null)
   const wishlistRequestsRef = useRef(new Set<number>())
+  const cartSyncReadyUserIdRef = useRef<number | null>(null)
+  const cartSyncQueueRef = useRef<Promise<void>>(Promise.resolve())
 
   const refreshUserWishlist = async (user: AuthUser): Promise<void> => {
     const guestItems = getSavedWishlist()
@@ -5386,6 +5504,42 @@ export default function App() {
     }
   }
 
+  const restoreUserCart = async (user: AuthUser): Promise<void> => {
+    if (user.role !== 'client') return
+    const { items } = await apiRequest<{
+      items: { id: number; name: string; category: string; price: number; img: string | null; qty: number }[]
+    }>(`/cart/${user.id}`)
+    const localById = new Map(ALL_PRODUCTS.map((product) => [product.id, product]))
+    const merged = new Map<number, CartItem>()
+    for (const item of items) {
+      const local = localById.get(item.id)
+      merged.set(item.id, {
+        id: item.id,
+        name: item.name,
+        price: Number(item.price),
+        priceLabel: `$${Number(item.price).toLocaleString('es-CO')}`,
+        img: item.img || local?.img || getBikeCategoryImage(item.category),
+        qty: Number(item.qty),
+      })
+    }
+    for (const item of getSavedCart()) {
+      const existing = merged.get(item.id)
+      merged.set(item.id, {
+        ...item,
+        ...existing,
+        qty: Math.min(20, item.qty + (existing?.qty ?? 0)),
+      })
+    }
+    const cart = [...merged.values()]
+    await apiRequest('/cart', {
+      method: 'POST',
+      body: { items: cart.map(({ id, qty }) => ({ productId: id, quantity: qty })) },
+    })
+    clearSavedCart()
+    setCartItems(cart)
+    cartSyncReadyUserIdRef.current = user.id
+  }
+
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode)
     try {
@@ -5394,6 +5548,24 @@ export default function App() {
       console.warn('No fue posible guardar la preferencia de tema.', error)
     }
   }, [darkMode])
+
+  useEffect(() => {
+    if (currentUser?.role === 'client' && cartSyncReadyUserIdRef.current === currentUser.id) clearSavedCart()
+    else if (cartSyncReadyUserIdRef.current === null) saveCart(cartItems)
+  }, [cartItems, currentUser])
+
+  useEffect(() => {
+    if (currentUser?.role !== 'client' || cartSyncReadyUserIdRef.current !== currentUser.id) return
+    const items = cartItems.map(({ id, qty }) => ({ productId: id, quantity: qty }))
+    const timeout = window.setTimeout(() => {
+      cartSyncQueueRef.current = cartSyncQueueRef.current
+        .then(() => apiRequest('/cart', { method: 'POST', body: { items } }).then(() => undefined))
+        .catch((error: unknown) => {
+          window.alert(error instanceof Error ? error.message : 'No fue posible sincronizar el carrito de tu cuenta.')
+        })
+    }, 250)
+    return () => window.clearTimeout(timeout)
+  }, [cartItems, currentUser])
 
   useEffect(() => {
     void apiRequest<{ items: (Partial<Product> & { id: number; price: number; stock: number; img: string | null })[] }>('/products?limit=100')
@@ -5423,7 +5595,14 @@ export default function App() {
 
   useEffect(() => {
     void apiRequest<{ user: AuthUser }>('/auth/me')
-      .then(({ user }) => {
+      .then(async ({ user }) => {
+        if (user.role === 'client') {
+          try {
+            await restoreUserCart(user)
+          } catch (error) {
+            window.alert(error instanceof Error ? error.message : 'No fue posible cargar el carrito de tu cuenta.')
+          }
+        }
         setCurrentUser(user)
         void refreshUserWishlist(user).catch((error: unknown) => {
           window.alert(error instanceof Error ? error.message : 'No fue posible cargar tu lista de deseos.')
@@ -5508,7 +5687,14 @@ export default function App() {
     setTimeout(() => setAddedId(null), 1500)
   }
 
-  const handleAuthSuccess = (user: AuthUser) => {
+  const handleAuthSuccess = async (user: AuthUser) => {
+    if (user.role === 'client') {
+      try {
+        await restoreUserCart(user)
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : 'No fue posible sincronizar el carrito de tu cuenta.')
+      }
+    }
     setCurrentUser(user)
     setAuthModalOpen(false)
     void refreshUserWishlist(user).catch((error: unknown) => {
@@ -5530,13 +5716,21 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
+      if (currentUser?.role === 'client' && cartSyncReadyUserIdRef.current === currentUser.id) {
+        await cartSyncQueueRef.current
+        await apiRequest('/cart', {
+          method: 'POST',
+          body: { items: cartItems.map(({ id, qty }) => ({ productId: id, quantity: qty })) },
+        })
+      }
       await apiRequest<void>('/auth/logout', { method: 'POST' })
+      cartSyncReadyUserIdRef.current = null
       setCurrentUser(null)
+      setCartItems([])
       setWishlist(getSavedWishlist())
       setWishlistProducts([])
       setUserMenuOpen(false)
       setAdminOpen(false)
-      setCartItems([])
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'No fue posible cerrar la sesión.')
     }
@@ -5638,6 +5832,7 @@ export default function App() {
       {/* ─── NAV ─────────────────────────────────────────────────────────── */}
       <header
         ref={headerRef}
+        id="store-header"
         className="sticky top-0 z-30 bg-white border-b border-gray-100 shadow-sm"
       >
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -5668,7 +5863,7 @@ export default function App() {
             </nav>
 
             {/* Utility Icons */}
-            <div className="flex items-center gap-1 sm:gap-2">
+            <div className="site-header-actions flex items-center gap-1 sm:gap-2">
               {/* Search desktop */}
               <div className={`hidden md:flex items-center bg-gray-50 rounded-full px-3 py-1.5 gap-2 border transition-all duration-200 ${searchOpen ? 'border-[#0D5C3A] w-48' : 'border-gray-200 w-36'}`}>
                 <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -5692,7 +5887,7 @@ export default function App() {
               </div>
 
               {/* Search mobile */}
-              <button onClick={handleSearchToggle} className="md:hidden p-2 rounded-full hover:bg-gray-100 transition-colors">
+              <button onClick={handleSearchToggle} aria-label="Buscar productos" className="md:hidden flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full hover:bg-gray-100 transition-colors">
                 <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
                 </svg>
@@ -5712,13 +5907,13 @@ export default function App() {
                 <div className="relative">
                   <button
                     onClick={() => setUserMenuOpen((v) => !v)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-gray-100 transition-colors"
+                    className="site-user-menu-button flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-gray-100 transition-colors"
                   >
                     <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-black ${currentUser.role === 'admin' ? 'bg-[#0D5C3A]' : 'bg-[#1A1A1A]'}`}>
                       {currentUser.name[0]}
                     </div>
                     <span className="hidden sm:block text-sm font-semibold text-gray-700 max-w-[90px] truncate">{currentUser.name.split(' ')[0]}</span>
-                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+                    <svg className="hidden sm:block w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
                   </button>
                   {userMenuOpen && (
                     <>
@@ -5767,7 +5962,7 @@ export default function App() {
               {/* Dark mode toggle */}
               <button
                 onClick={() => setDarkMode(d => !d)}
-                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                className="site-header-theme flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
                 title={darkMode ? 'Modo claro' : 'Modo oscuro'}
               >
                 {darkMode ? (
@@ -5780,7 +5975,8 @@ export default function App() {
               {/* Wishlist */}
               <button
                 onClick={() => setWishlistOpen(true)}
-                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors relative"
+                aria-label="Abrir favoritos"
+                className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
               >
                 <svg
                   className={`w-5 h-5 transition-colors ${wishlist.length > 0 ? 'fill-[#0D5C3A] text-[#0D5C3A]' : 'text-gray-700'}`}
@@ -5801,7 +5997,8 @@ export default function App() {
               {/* Cart — shopping cart icon with badge */}
               <button
                 onClick={() => setCartOpen(true)}
-                className="p-2 rounded-full hover:bg-gray-100 transition-colors relative"
+                aria-label="Abrir carrito"
+                className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
               >
                 <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
@@ -5815,7 +6012,9 @@ export default function App() {
 
               {/* Mobile hamburger */}
               <button
-                className="lg:hidden p-2 rounded-full hover:bg-gray-100"
+                aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
+                aria-expanded={menuOpen}
+                className="lg:hidden flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full hover:bg-gray-100"
                 onClick={() => setMenuOpen(!menuOpen)}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -5891,12 +6090,12 @@ export default function App() {
 
         {/* Mobile Menu */}
         {menuOpen && (
-          <div className="lg:hidden border-t border-gray-100 bg-white px-4 py-4 flex flex-col gap-4">
+          <div className="lg:hidden border-t border-gray-100 bg-white px-4 py-4 flex flex-col gap-2">
             {NAV_LINKS.map((link) => (
               <button
                 key={link.label}
                 onClick={() => { scrollTo(link.section); setMenuOpen(false) }}
-                className="text-sm font-medium text-gray-700 hover:text-[#0D5C3A] text-left"
+                className="min-h-11 text-sm font-medium text-gray-700 hover:text-[#0D5C3A] text-left"
               >
                 {link.label}
               </button>
@@ -5929,15 +6128,15 @@ export default function App() {
         <div className="store-hero__overlay absolute inset-0" />
         <div className="store-hero__glow absolute -right-32 -top-32 h-96 w-96 rounded-full" aria-hidden="true" />
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-40">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 lg:py-40">
           <div className="store-hero__content max-w-2xl">
             <span className="store-hero__eyebrow mb-5 inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-emerald-200">
               Diseñadas para ir más lejos
             </span>
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black leading-none mb-6" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+            <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black leading-tight sm:leading-none mb-6" style={{ fontFamily: 'Montserrat, sans-serif' }}>
               Encuentra tu <br /><span className="store-hero__accent">ruta perfecta.</span>
             </h1>
-            <p className="store-hero__description text-lg lg:text-xl leading-relaxed mb-10 max-w-xl">
+            <p className="store-hero__description text-base sm:text-lg lg:text-xl leading-relaxed mb-8 sm:mb-10 max-w-xl">
               Explora nuestra colección de bicicletas de ruta, montaña y urbanas de alto rendimiento.
             </p>
             <div className="flex flex-wrap gap-4">
@@ -5946,7 +6145,7 @@ export default function App() {
                   setActiveCategory('Todas')
                   scrollTo('productos')
                 })}
-                className="store-hero__cta bg-[#0D5C3A] hover:bg-[#1A8A5A] text-white font-bold px-10 py-4 rounded-full text-sm tracking-widest uppercase"
+                className="store-hero__cta min-h-12 bg-[#0D5C3A] hover:bg-[#1A8A5A] text-white font-bold px-8 sm:px-10 py-4 rounded-full text-sm tracking-widest uppercase"
               >
                 Ver Bicicletas
               </button>
@@ -5973,12 +6172,12 @@ export default function App() {
       </section>
 
       {/* ─── FEATURED PRODUCTS ────────────────────────────────────────────── */}
-      <section id="productos" className="catalog-section py-20 lg:py-28">
+      <section id="productos" className="catalog-section py-12 sm:py-20 lg:py-28">
         <div className="catalog-section__content max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-end justify-between mb-8">
+          <div className="flex items-end justify-between gap-4 mb-8">
             <div>
               <span className="text-[#0D5C3A] text-xs font-bold tracking-[0.2em] uppercase block mb-2">Selección Editorial</span>
-              <h2 className="text-4xl lg:text-5xl font-black text-[#1A1A1A]" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#1A1A1A]" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                 Bicicletas Destacadas
               </h2>
             </div>
@@ -5990,12 +6189,12 @@ export default function App() {
           </div>
 
           {/* Category filter */}
-          <div className="flex gap-2 flex-wrap mb-4">
+          <div className="catalog-categories flex gap-2 flex-wrap mb-4">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`px-5 py-2 rounded-full text-sm font-bold transition-all duration-200 ${
+                className={`min-h-11 px-4 sm:px-5 py-2 rounded-full text-sm font-bold transition-all duration-200 ${
                   activeCategory === cat
                     ? 'bg-[#0D5C3A] text-white shadow-md'
                     : 'bg-[#F4F4F5] text-gray-600 hover:bg-gray-200'
@@ -6004,7 +6203,7 @@ export default function App() {
                 {cat}
               </button>
             ))}
-            <div className="ml-auto flex items-center gap-2">
+            <div className="catalog-sort ml-auto flex items-center gap-2">
               <label className="text-xs font-bold text-gray-500 whitespace-nowrap">Ordenar por precio:</label>
               <select
                 value={priceSort}
@@ -6019,7 +6218,7 @@ export default function App() {
           </div>
 
           {/* Price range filter */}
-          <div className="flex flex-wrap items-center gap-3 mb-6 bg-[#F4F4F5] rounded-2xl px-4 py-3">
+          <div className="catalog-price-filters flex flex-wrap items-center gap-3 mb-6 bg-[#F4F4F5] rounded-2xl px-4 py-3">
             <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Rango de precio:</span>
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500">De</span>
@@ -6080,7 +6279,7 @@ export default function App() {
                     onClick={() => setSelectedProduct(p)}
                   >
                     <img
-                      src={p.img}
+                      src={p.img || getBikeCategoryImage(p.category)}
                       alt={p.name}
                       className="catalog-card__image absolute inset-0 transition-transform duration-500 group-hover:scale-105"
                       loading="lazy"
@@ -6129,7 +6328,7 @@ export default function App() {
                       <StarRating rating={p.rating} />
                       <span className="text-[10px] text-gray-500">({p.reviews})</span>
                     </div>
-                    <div className="mt-auto flex items-center justify-between gap-2">
+                    <div className="catalog-card__purchase mt-auto flex items-center justify-between gap-2">
                       <span className="flex flex-col">
                         {p.offerDiscount && p.originalPrice && <span className="text-xs text-gray-400 line-through">${p.originalPrice.toLocaleString('es-CO')}</span>}
                         <span className="text-base font-black text-[#1A1A1A]">{p.priceLabel}</span>
@@ -6138,7 +6337,7 @@ export default function App() {
                       <button
                         onClick={() => p.stock > 0 && addToCart(p)}
                         disabled={p.stock === 0}
-                        className={`h-10 w-36 flex-none justify-center whitespace-nowrap text-white text-xs font-bold rounded-full transition-all duration-200 tracking-wide flex items-center gap-1.5 ${
+                        className={`catalog-card__add-button min-h-11 h-11 w-36 flex-none justify-center whitespace-nowrap text-white text-xs font-bold rounded-full transition-all duration-200 tracking-wide flex items-center gap-1.5 ${
                           p.stock === 0
                             ? 'bg-gray-300 opacity-60 cursor-not-allowed'
                             : addedId === p.id
@@ -6158,7 +6357,7 @@ export default function App() {
       </section>
 
       {/* ─── PARTS & COMPONENTS ─────────────────────────────────────────── */}
-      <section id="repuestos" className="py-20 lg:py-28 bg-white">
+      <section id="repuestos" className="py-12 sm:py-20 lg:py-28 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl mb-12">
             <span className="text-[#0D5C3A] text-xs font-bold tracking-[0.2em] uppercase block mb-3">Todo para tu bicicleta</span>
@@ -6326,7 +6525,7 @@ export default function App() {
             </div>
 
             {[
-              { title: 'Explorar', links: ['Bicicletas de Ruta', 'Bicicletas de Montaña', 'Urbanas', 'Accesorios', 'Ropa'] },
+              { title: 'Explorar', links: ['Bicicletas de Ruta', 'Bicicletas de Montaña', 'Urbanas', 'Accesorios'] },
               { title: 'Servicios', links: ['Mantenimiento', 'Ensamble', 'Reparaciones', 'Asesoría', 'Envíos'] },
               { title: 'Soporte', links: ['Centro de Ayuda', 'Devoluciones', 'Garantía', 'Contacto', 'Tiendas'] },
               { title: 'Empresa', links: ['Nosotros', 'Trabaja con nosotros', 'Blog', 'Prensa'] },
