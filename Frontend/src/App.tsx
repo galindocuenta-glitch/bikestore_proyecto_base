@@ -26,13 +26,17 @@ import kidsManaslu16Img from './assets/catalog/bike-67.png'
 import kidsSkadiImg from './assets/catalog/bike-68.png'
 import kidsShadowImg from './assets/catalog/bike-69.png'
 import kidsManaslu20Img from './assets/catalog/bike-70.png'
-import cockpitHandlebarImg from './assets/parts/cockpit/product-1.png'
-import cockpitStemImg from './assets/parts/cockpit/product-2.png'
-import cockpitGripsImg from './assets/parts/cockpit/product-3.png'
-import cockpitSaddleImg from './assets/parts/cockpit/product-4.png'
-import { WHEEL_PHOTOS } from './parts-images'
-import { apiRequest, AUTH_TOKEN_KEY } from './api'
+import {
+  PART_IMAGE_LIBRARY,
+  getBikeCategoryImage,
+  getBikeImageFallback,
+  getPartImageFallback,
+  getWheelImageFallback,
+  handleImageFallback,
+} from './image-library'
+import { apiRequest } from './api'
 import { downloadXlsx } from './xlsx'
+import { jsPDF } from 'jspdf'
 
 let cartAudioContext: AudioContext | null = null
 
@@ -57,6 +61,24 @@ function playCartAddedSound(): void {
   } catch (error) {
     console.warn('No fue posible reproducir el sonido de confirmación del carrito.', error)
   }
+}
+
+function handleDigitsOnlyKeyDown(event: React.KeyboardEvent<HTMLInputElement>): void {
+  if (
+    event.ctrlKey || event.metaKey || event.altKey ||
+    ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Enter'].includes(event.key) ||
+    /^\d$/.test(event.key)
+  ) return
+  event.preventDefault()
+}
+
+function digitsOnly(value: string): string {
+  return value.replace(/\D/g, '')
+}
+
+function formatAppointmentDate(value: string): string {
+  const date = new Date(`${value.replace(' ', 'T')}Z`)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('es-CO')
 }
 
 // ─── Gallery URLs (Unsplash) ─────────────────────────────────────────────────
@@ -158,20 +180,97 @@ const NAV_LINKS = [
   { label: 'Reseñas', section: 'resenas' },
 ]
 
-const REVIEWS = [
-  { name: 'Carlos Andrés Ospina', date: 'Agosto 2026', rating: 5, bike: 'GW Hawk MTB 29 12V', comment: 'Increíble bicicleta. La compré para el cerro El Ávila y superó todas mis expectativas. La suspensión absorbe todo y la transmisión es muy precisa. El equipo de BS me asesoró muy bien desde el principio.' },
-  { name: 'Valentina Ríos Herrera', date: 'Julio 2026', rating: 5, bike: 'GW Gavia 700C', comment: 'La Gavia es una bicicleta liviana, rígida y rápida. La recomiendo 100% para ciclovía y entrenamientos en carretera. El servicio posventa de BS es excelente.' },
-  { name: 'Sebastián Gómez Jaramillo', date: 'Septiembre 2026', rating: 5, bike: 'Starker Sport 2.0 Pro', comment: 'Me cambió la vida. Puedo subir el Alto de Patios sin morir en el intento. La bicicleta eléctrica es perfecta para quienes queremos disfrutar sin sufrir. ¡Gracias BS Bike Store!' },
-  { name: 'Marcela Torres Agudelo', date: 'Agosto 2026', rating: 4, bike: 'GW Dancer 12', comment: 'Compré la Dancer para mi hija de 3 años y le encantó. Llegó bien embalada y el ensamble fue sencillo. La calidad es superior a otras marcas que probé.' },
-  { name: 'Jhon Alexander Peña', date: 'Julio 2026', rating: 5, bike: 'Jeep Baltoro 29', comment: 'Para los que hacemos descenso en La Cuchilla, esta Baltoro es una bestia. El soporte de BS fue impecable, me explicaron cada componente antes de comprar. Sin duda la mejor inversión.' },
-  { name: 'Diana Milena Castillo', date: 'Septiembre 2026', rating: 4, bike: 'Starker T-Flex Pro', comment: 'La uso para ir al trabajo todos los días en Bogotá. La batería me permite llegar sin problema desde Suba hasta Chapinero. Muy satisfecha con la compra y el equipo de BS.' },
-]
+type NavMenuLink = { label: string; section: string; category?: string }
+type NavMenuContent = {
+  columns: { heading: string; links: NavMenuLink[] }[]
+  featured: { eyebrow: string; title: string; description: string; link: NavMenuLink }
+}
+
+const NAV_MENU_CONTENT: Record<string, NavMenuContent> = {
+  Bicicletas: {
+    columns: [
+      { heading: 'Explora por estilo', links: [
+        { label: 'Todas las bicicletas', section: 'productos', category: 'Todas' },
+        { label: 'Montaña y todo terreno', section: 'productos', category: 'Todo Terreno' },
+        { label: 'Bicicletas de ruta', section: 'productos', category: 'Ruta' },
+      ] },
+      { heading: 'Para cada ciclista', links: [
+        { label: 'Bicicletas eléctricas', section: 'productos', category: 'Eléctrica' },
+        { label: 'Bicicletas infantiles', section: 'productos', category: 'Infantil' },
+        { label: 'Ofertas y destacados', section: 'productos', category: 'Todas' },
+      ] },
+    ],
+    featured: {
+      eyebrow: 'Encuentra tu próxima bici',
+      title: 'Lista para tu siguiente ruta',
+      description: 'Explora modelos seleccionados para ciudad, montaña y carretera.',
+      link: { label: 'Ver catálogo completo', section: 'productos', category: 'Todas' },
+    },
+  },
+  'Repuestos y Partes': {
+    columns: [
+      { heading: 'Componentes', links: [
+        { label: 'Llantas y rines', section: 'repuestos' },
+        { label: 'Sillines y cockpit', section: 'repuestos' },
+        { label: 'Transmisión y frenos', section: 'repuestos' },
+      ] },
+      { heading: 'Ayuda para elegir', links: [
+        { label: 'Ver todos los repuestos', section: 'repuestos' },
+        { label: 'Asesoría de compatibilidad', section: 'repuestos' },
+      ] },
+    ],
+    featured: {
+      eyebrow: '¿No sabes cuál necesitas?',
+      title: 'Te ayudamos a elegir',
+      description: 'Nuestro equipo revisa la compatibilidad de cada pieza.',
+      link: { label: 'Ver repuestos', section: 'repuestos' },
+    },
+  },
+  'Taller y Servicios': {
+    columns: [
+      { heading: 'Mantenimiento', links: [
+        { label: 'Mantenimiento preventivo', section: 'servicios' },
+        { label: 'Ajuste y puesta a punto', section: 'servicios' },
+        { label: 'Diagnóstico mecánico', section: 'servicios' },
+      ] },
+      { heading: 'Atención especializada', links: [
+        { label: 'Reparaciones', section: 'servicios' },
+        { label: 'Ensamble personalizado', section: 'servicios' },
+        { label: 'Ver todos los servicios', section: 'servicios' },
+      ] },
+    ],
+    featured: {
+      eyebrow: 'Agenda en pocos minutos',
+      title: 'Tu bici en buenas manos',
+      description: 'Consulta los servicios disponibles y programa una cita.',
+      link: { label: 'Explorar servicios', section: 'servicios' },
+    },
+  },
+  Reseñas: {
+    columns: [
+      { heading: 'Comunidad', links: [
+        { label: 'Opiniones de ciclistas', section: 'resenas' },
+        { label: 'Bicicletas destacadas', section: 'productos', category: 'Todas' },
+      ] },
+    ],
+    featured: {
+      eyebrow: 'Experiencias reales',
+      title: 'Pedalea con confianza',
+      description: 'Conoce lo que otros ciclistas opinan de sus bicicletas.',
+      link: { label: 'Leer reseñas', section: 'resenas' },
+    },
+  },
+}
 
 interface Product {
   id: number
   name: string
   category: string
   price: number
+  originalPrice?: number
+  offerDiscount?: number | null
+  offerTitle?: string | null
+  offerId?: number | null
   priceLabel: string
   rating: number
   reviews: number
@@ -182,6 +281,17 @@ interface Product {
   description: string
   stock: number
   darkBg?: boolean
+}
+
+interface PublicReview {
+  id: number
+  productId: number
+  productName: string
+  rating: number
+  comment: string
+  createdAt: string
+  author: string
+  verifiedPurchase: boolean
 }
 
 const MTN = 'https://images.unsplash.com/photo-1779114690396-a1115352c0cb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=800'
@@ -504,8 +614,6 @@ const ALL_PRODUCTS: Product[] = [
   },
 ]
 
-const WHITE_GRID_IMAGE_PRODUCT_IDS = new Set([1, 2, 3, 4, 5, 7, 8, 10, 11, 12, 13, 15, 16, 22])
-
 const CATEGORIES = ['Todas', 'Todo Terreno', 'Eléctrica', 'Ruta', 'Infantil']
 
 const COLOMBIA_DEPTS: Record<string, string[]> = {
@@ -600,67 +708,67 @@ const PART_CATEGORIES = [
   {
     title: 'Llantas y Rines',
     desc: 'Cubiertas, cámaras, rines, radios y sistemas tubeless.',
-    img: 'https://images.unsplash.com/photo-1671179517648-0e4e6ddd3ea7?auto=format&fit=crop&w=900&q=85',
+    img: PART_IMAGE_LIBRARY.covers.tires,
     products: [
-      { name: 'Llanta Chaoyang MTB 29 x 2.10', price: '$89.900', img: 'https://images.unsplash.com/photo-1684072460085-5b51541d122b?auto=format&fit=crop&w=500&q=85' },
-      { name: 'Rin de aluminio doble pared 29', price: '$149.900', img: 'https://images.unsplash.com/photo-1756967587801-63704d039cbd?auto=format&fit=crop&w=500&q=85' },
-      { name: 'Cámara 29 válvula presta', price: '$24.900', img: 'https://images.unsplash.com/photo-1564680955772-254d76db8aaf?auto=format&fit=crop&w=500&q=85' },
-      { name: 'Kit tubeless para dos ruedas', price: '$79.900', img: 'https://images.unsplash.com/photo-1671790673593-194e2164128b?auto=format&fit=crop&w=500&q=85' },
+      { name: 'Llanta Chaoyang MTB 29 x 2.10', price: '$89.900', img: PART_IMAGE_LIBRARY.tires[0] },
+      { name: 'Rin de aluminio doble pared 29', price: '$149.900', img: PART_IMAGE_LIBRARY.rims[0] },
+      { name: 'Cámara 29 válvula presta', price: '$24.900', img: PART_IMAGE_LIBRARY.tubes[0] },
+      { name: 'Kit tubeless para dos ruedas', price: '$79.900', img: PART_IMAGE_LIBRARY.tubeless[0] },
     ],
   },
   {
     title: 'Transmisión',
     desc: 'Cadenas, cassettes, platos, bielas y desviadores.',
-    img: 'https://images.unsplash.com/photo-1517263975512-e1e9172f466b?auto=format&fit=crop&w=900&q=85',
+    img: PART_IMAGE_LIBRARY.covers.transmission,
     products: [
-      { name: 'Cadena Shimano Deore 12 velocidades', price: '$189.900', img: 'https://images.unsplash.com/photo-1517263975512-e1e9172f466b?auto=format&fit=crop&w=500&q=85' },
-      { name: 'Cassette Shimano 11–51T 11 velocidades', price: '$329.900', img: 'https://images.unsplash.com/photo-1625242825294-dcc908480fae?auto=format&fit=crop&w=500&q=85' },
-      { name: 'Desviador Shimano Altus 9 velocidades', price: '$159.900', img: 'https://images.unsplash.com/photo-1687640977275-3bd12cb1ddce?auto=format&fit=crop&w=500&q=85' },
-      { name: 'Plato monoplato 32T narrow-wide', price: '$99.900', img: 'https://images.unsplash.com/photo-1661453444174-105f3bfebca7?auto=format&fit=crop&w=500&q=85' },
+      { name: 'Cadena Shimano Deore 12 velocidades', price: '$189.900', img: PART_IMAGE_LIBRARY.transmission[0] },
+      { name: 'Cassette Shimano 11–51T 11 velocidades', price: '$329.900', img: PART_IMAGE_LIBRARY.transmission[1] },
+      { name: 'Desviador Shimano Altus 9 velocidades', price: '$159.900', img: PART_IMAGE_LIBRARY.transmission[2] },
+      { name: 'Plato monoplato 32T narrow-wide', price: '$99.900', img: PART_IMAGE_LIBRARY.transmission[3] },
     ],
   },
   {
     title: 'Frenos',
     desc: 'Pastillas, discos, mordazas y sistemas hidráulicos.',
-    img: 'https://images.unsplash.com/photo-1637289031879-dc6acc591e3f?auto=format&fit=crop&w=900&q=85',
+    img: PART_IMAGE_LIBRARY.covers.brakes,
     products: [
-      { name: 'Pastillas de resina Shimano B05S', price: '$49.900', img: 'https://images.unsplash.com/photo-1637289031879-dc6acc591e3f?auto=format&fit=crop&w=500&q=85' },
-      { name: 'Disco de freno 180 mm', price: '$79.900', img: 'https://images.unsplash.com/photo-1639745159169-db1d3c0cfe78?auto=format&fit=crop&w=500&q=85' },
-      { name: 'Frenos hidráulicos Shimano MT200', price: '$349.900', img: 'https://images.unsplash.com/photo-1649498936735-27af90c73259?auto=format&fit=crop&w=500&q=85' },
-      { name: 'Líquido mineral para frenos 100 ml', price: '$39.900', img: 'https://images.unsplash.com/photo-1617307327024-14c0a02125fd?auto=format&fit=crop&w=500&q=85' },
+      { name: 'Pastillas de resina Shimano B05S', price: '$49.900', img: PART_IMAGE_LIBRARY.brakes[0] },
+      { name: 'Disco de freno 180 mm', price: '$79.900', img: PART_IMAGE_LIBRARY.brakes[1] },
+      { name: 'Frenos hidráulicos Shimano MT200', price: '$349.900', img: PART_IMAGE_LIBRARY.brakes[2] },
+      { name: 'Líquido mineral para frenos 100 ml', price: '$39.900', img: PART_IMAGE_LIBRARY.brakes[3] },
     ],
   },
   {
     title: 'Suspensión',
     desc: 'Horquillas, amortiguadores, retenes y repuestos.',
-    img: 'https://images.unsplash.com/photo-1570539589648-51a594f1676d?auto=format&fit=crop&w=900&q=85',
+    img: PART_IMAGE_LIBRARY.covers.suspension,
     products: [
-      { name: 'Horquilla Suntour XCM para rin 29', price: '$649.900', img: 'https://images.unsplash.com/photo-1727281623511-e85c1c34d151?auto=format&fit=crop&w=500&q=85' },
-      { name: 'Amortiguador RockShox Deluxe', price: '$1.249.900', img: 'https://images.unsplash.com/photo-1636925281365-f82e35b7e1c7?auto=format&fit=crop&w=500&q=85' },
-      { name: 'Kit de retenes para barras de 32 mm', price: '$89.900', img: 'https://images.unsplash.com/photo-1638194216708-fb57a1bf7cf7?auto=format&fit=crop&w=500&q=85' },
-      { name: 'Control de bloqueo remoto', price: '$129.900', img: 'https://images.unsplash.com/photo-1614675498441-693649a7df6d?auto=format&fit=crop&w=500&q=85' },
+      { name: 'Horquilla Suntour XCM para rin 29', price: '$649.900', img: PART_IMAGE_LIBRARY.suspension[0] },
+      { name: 'Amortiguador RockShox Deluxe', price: '$1.249.900', img: PART_IMAGE_LIBRARY.suspension[1] },
+      { name: 'Kit de retenes para barras de 32 mm', price: '$89.900', img: PART_IMAGE_LIBRARY.suspension[2] },
+      { name: 'Control de bloqueo remoto', price: '$129.900', img: PART_IMAGE_LIBRARY.suspension[3] },
     ],
   },
   {
     title: 'Sillines y Cockpit',
     desc: 'Sillines, manubrios, potencias y puños para mejorar el control y la comodidad.',
-    img: cockpitSaddleImg,
+    img: PART_IMAGE_LIBRARY.covers.cockpit,
     products: [
-      { name: 'Manubrio MTB de aluminio 31.8 mm', price: '$119.900', img: cockpitHandlebarImg },
-      { name: 'Potencia MTB corta 31.8 mm', price: '$89.900', img: cockpitStemImg },
-      { name: 'Puños ergonómicos con bloqueo', price: '$54.900', img: cockpitGripsImg },
-      { name: 'Sillín GW deportivo 270 mm', price: '$109.900', img: cockpitSaddleImg },
+      { name: 'Manubrio MTB de aluminio 31.8 mm', price: '$119.900', img: PART_IMAGE_LIBRARY.cockpit[0] },
+      { name: 'Potencia MTB corta 31.8 mm', price: '$89.900', img: PART_IMAGE_LIBRARY.cockpit[1] },
+      { name: 'Puños ergonómicos con bloqueo', price: '$54.900', img: PART_IMAGE_LIBRARY.cockpit[2] },
+      { name: 'Sillín GW deportivo 270 mm', price: '$109.900', img: PART_IMAGE_LIBRARY.cockpit[3] },
     ],
   },
   {
     title: 'Componentes Eléctricos',
     desc: 'Baterías, motores, controladores y kits de conversión.',
-    img: 'https://images.unsplash.com/photo-1763041821558-13fb6264be3f?auto=format&fit=crop&w=900&q=85',
+    img: PART_IMAGE_LIBRARY.covers.electric,
     products: [
-      { name: 'Batería de litio 48V 13Ah', price: '$1.699.900', img: 'https://images.unsplash.com/photo-1669183013484-88ecafacc5f3?auto=format&fit=crop&w=500&q=85' },
-      { name: 'Controlador para motor 48V', price: '$289.900', img: 'https://images.unsplash.com/photo-1700705581209-0c207be805ed?auto=format&fit=crop&w=500&q=85' },
-      { name: 'Pantalla LCD multifunción', price: '$349.900', img: 'https://images.unsplash.com/photo-1700792746333-0402b7893b55?auto=format&fit=crop&w=500&q=85' },
-      { name: 'Cargador inteligente 48V 2A', price: '$179.900', img: 'https://images.unsplash.com/photo-1763041821558-13fb6264be3f?auto=format&fit=crop&w=500&q=85' },
+      { name: 'Batería de litio 48V 13Ah', price: '$1.699.900', img: PART_IMAGE_LIBRARY.electric[0] },
+      { name: 'Controlador para motor 48V', price: '$289.900', img: PART_IMAGE_LIBRARY.electric[1] },
+      { name: 'Pantalla LCD multifunción', price: '$349.900', img: PART_IMAGE_LIBRARY.electric[2] },
+      { name: 'Cargador inteligente 48V 2A', price: '$179.900', img: PART_IMAGE_LIBRARY.electric[3] },
     ],
   },
 ]
@@ -692,7 +800,7 @@ const WHEEL_VARIANTS = [
   ],
 ].map((group, kindIndex) => group.map((item, variantIndex) => ({
   ...item,
-  img: WHEEL_PHOTOS[kindIndex][variantIndex].img,
+  img: PART_IMAGE_LIBRARY.wheels[kindIndex][variantIndex],
 })))
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -720,9 +828,15 @@ function ProductDetailModal({
   }, [product])
 
   useEffect(() => {
-    if (product) document.body.style.overflow = 'hidden'
-    else document.body.style.overflow = ''
-    return () => { document.body.style.overflow = '' }
+    if (!product) return
+    const previousBodyOverflow = document.body.style.overflow
+    const previousDocumentOverflow = document.documentElement.style.overflow
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousBodyOverflow
+      document.documentElement.style.overflow = previousDocumentOverflow
+    }
   }, [product])
 
   if (!product) return null
@@ -735,9 +849,14 @@ function ProductDetailModal({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
-        <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto shadow-2xl modal-animate">
+      <div className="modal-backdrop-animate fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-6">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Detalles de ${product.name}`}
+          className="modal-scroll-region bg-white rounded-2xl w-full max-w-4xl max-h-[85vh] overflow-y-auto shadow-2xl modal-animate"
+        >
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
             <div className="flex items-center gap-2">
@@ -763,6 +882,7 @@ function ProductDetailModal({
                   src={product.gallery[activeImg]}
                   alt={product.name}
                   className="max-h-full max-w-full object-contain p-4 transition-all duration-300 img-product"
+                  onError={(event) => handleImageFallback(event, getBikeImageFallback(product.category))}
                 />
               </div>
               {product.gallery.length > 1 && (
@@ -775,7 +895,12 @@ function ProductDetailModal({
                         activeImg === i ? 'border-[#0D5C3A] scale-105 shadow-md' : 'border-transparent hover:border-gray-300'
                       }`}
                     >
-                      <img src={img} alt={`Vista ${i + 1} de ${product.name}`} className="w-full h-full object-contain bg-white img-thumb" />
+                      <img
+                        src={img}
+                        alt={`Vista ${i + 1} de ${product.name}`}
+                        className="w-full h-full object-contain bg-white img-thumb"
+                        onError={(event) => handleImageFallback(event, getBikeImageFallback(product.category))}
+                      />
                     </button>
                   ))}
                 </div>
@@ -818,9 +943,13 @@ function ProductDetailModal({
               {/* Price + actions */}
               <div className="mt-auto">
                 <div className="flex items-baseline gap-2 mb-3">
+                  {product.offerDiscount && product.originalPrice && (
+                    <span className="text-sm text-gray-400 line-through">${product.originalPrice.toLocaleString('es-CO')}</span>
+                  )}
                   <span className="text-3xl font-black text-[#1A1A1A]" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                     {product.priceLabel}
                   </span>
+                  {product.offerDiscount && <span className="text-xs font-bold text-emerald-700">-{product.offerDiscount}%</span>}
                   <span className="text-xs text-gray-400">COP · IVA incluido</span>
                 </div>
 
@@ -898,23 +1027,45 @@ function StarRating({ rating }: { rating: number }) {
   )
 }
 
-function ReviewForm({ onSubmit }: { onSubmit: (r: { name: string; date: string; rating: number; bike: string; comment: string }) => void }) {
-  const [reviewName, setReviewName] = useState('')
+function ReviewForm({
+  products,
+  user,
+  onRequestLogin,
+  onSubmit,
+}: {
+  products: Product[]
+  user: AuthUser | null
+  onRequestLogin: () => void
+  onSubmit: (review: { productId: number; rating: number; comment: string }) => Promise<void>
+}) {
   const [reviewComment, setReviewComment] = useState('')
   const [reviewRating, setReviewRating] = useState(0)
   const [reviewHover, setReviewHover] = useState(0)
-  const [reviewBike, setReviewBike] = useState('')
+  const [productId, setProductId] = useState(products[0]?.id ?? 0)
   const [reviewSubmitted, setReviewSubmitted] = useState(false)
   const [reviewError, setReviewError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!products.some((product) => product.id === productId)) setProductId(products[0]?.id ?? 0)
+  }, [products, productId])
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!reviewName.trim() || !reviewComment.trim()) { setReviewError('Por favor completa tu nombre y comentario.'); return }
+    if (!user) { onRequestLogin(); return }
+    if (!productId) { setReviewError('Selecciona el producto que quieres calificar.'); return }
+    if (reviewComment.trim().length < 10) { setReviewError('El comentario debe tener al menos 10 caracteres.'); return }
     if (reviewRating === 0) { setReviewError('Selecciona una calificación de estrellas.'); return }
-    const now = new Date()
-    const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-    onSubmit({ name: reviewName.trim(), date: `${months[now.getMonth()]} ${now.getFullYear()}`, rating: reviewRating, bike: reviewBike.trim() || 'Bicicleta BS', comment: reviewComment.trim() })
-    setReviewSubmitted(true)
+    setSubmitting(true)
+    setReviewError('')
+    try {
+      await onSubmit({ productId, rating: reviewRating, comment: reviewComment.trim() })
+      setReviewSubmitted(true)
+    } catch (error) {
+      setReviewError(error instanceof Error ? error.message : 'No fue posible enviar la reseña.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (reviewSubmitted) {
@@ -924,7 +1075,7 @@ function ReviewForm({ onSubmit }: { onSubmit: (r: { name: string; date: string; 
           <svg className="w-7 h-7 text-[#0D5C3A]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
         </div>
         <p className="font-black text-[#1A1A1A] text-xl mb-1" style={{fontFamily:'Montserrat, sans-serif'}}>¡Gracias por tu reseña!</p>
-        <p className="text-gray-500 text-sm">Tu opinión ya aparece en nuestra sección de reseñas.</p>
+        <p className="text-gray-500 text-sm">La reseña quedó pendiente de moderación y aparecerá cuando sea aprobada.</p>
       </div>
     )
   }
@@ -932,8 +1083,14 @@ function ReviewForm({ onSubmit }: { onSubmit: (r: { name: string; date: string; 
   return (
     <form onSubmit={handleSubmit} className="mt-12 bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
       <h3 className="text-xl font-black text-[#1A1A1A] mb-1" style={{fontFamily:'Montserrat, sans-serif'}}>¿Tienes una bicicleta de BS?</h3>
-      <p className="text-gray-500 text-sm mb-6">Comparte tu experiencia con otros ciclistas</p>
+      <p className="text-gray-500 text-sm mb-6">{user ? `Reseña como ${user.name}. Tu opinión se publicará después de moderación.` : 'Inicia sesión para compartir tu experiencia. Todas las reseñas son moderadas.'}</p>
       <div className="space-y-5">
+        <div>
+          <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Producto</label>
+          <select value={productId} onChange={(event) => setProductId(Number(event.target.value))} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D5C3A]/30" disabled={!products.length}>
+            {products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
+          </select>
+        </div>
         <div>
           <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">Tu calificación</label>
           <div className="flex items-center gap-1">
@@ -947,23 +1104,13 @@ function ReviewForm({ onSubmit }: { onSubmit: (r: { name: string; date: string; 
             {reviewRating > 0 && <span className="ml-2 text-sm font-bold text-[#0D5C3A]">{['','Malo','Regular','Bueno','Muy bueno','Excelente'][reviewRating]}</span>}
           </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Tu nombre *</label>
-            <input value={reviewName} onChange={e=>setReviewName(e.target.value)} placeholder="Ej: Carlos Andrés Ospina" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D5C3A]/30 focus:border-[#0D5C3A] transition-all" />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Modelo de bicicleta</label>
-            <input value={reviewBike} onChange={e=>setReviewBike(e.target.value)} placeholder="Ej: GW Hawk MTB 29 12V" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D5C3A]/30 focus:border-[#0D5C3A] transition-all" />
-          </div>
-        </div>
         <div>
           <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Tu comentario *</label>
           <textarea value={reviewComment} onChange={e=>setReviewComment(e.target.value)} placeholder="Cuéntanos tu experiencia con tu bicicleta BS..." rows={4} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D5C3A]/30 focus:border-[#0D5C3A] transition-all resize-none" />
         </div>
         {reviewError && <p className="text-xs text-red-500 font-semibold bg-red-50 border border-red-200 rounded-xl px-3 py-2">{reviewError}</p>}
-        <button type="submit" className="bg-[#0D5C3A] hover:bg-[#1A8A5A] text-white font-black px-8 py-3.5 rounded-full text-sm tracking-wide transition-colors">
-          Enviar reseña
+        <button type="submit" disabled={submitting || !products.length} className="bg-[#0D5C3A] hover:bg-[#1A8A5A] text-white font-black px-8 py-3.5 rounded-full text-sm tracking-wide transition-colors disabled:opacity-50">
+          {submitting ? 'Enviando…' : user ? 'Enviar reseña' : 'Iniciar sesión para reseñar'}
         </button>
       </div>
     </form>
@@ -1122,16 +1269,18 @@ function WishlistDrawer({
   open,
   onClose,
   wishlist,
-  onToggleWishlist,
+  products,
+  onRemoveWishlist,
   onAddToCart,
 }: {
   open: boolean
   onClose: () => void
   wishlist: number[]
-  onToggleWishlist: (id: number) => void
+  products: Product[]
+  onRemoveWishlist: (id: number) => void
   onAddToCart: (p: Product) => void
 }) {
-  const products = ALL_PRODUCTS.filter(p => wishlist.includes(p.id))
+  const wishlistProducts = products.filter((product) => wishlist.includes(product.id))
 
   useEffect(() => {
     if (open) document.body.style.overflow = 'hidden'
@@ -1161,7 +1310,7 @@ function WishlistDrawer({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {products.length === 0 ? (
+          {wishlistProducts.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-4 text-gray-400">
               <svg className="w-16 h-16 opacity-20" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
@@ -1175,7 +1324,7 @@ function WishlistDrawer({
               </button>
             </div>
           ) : (
-            products.map((p) => (
+            wishlistProducts.map((p) => (
               <div key={p.id} className="flex gap-3 bg-[#F4F4F5] rounded-xl p-3">
                 <div className="w-20 h-20 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center bg-white">
                   <img src={p.img} alt={p.name} className="w-full h-full object-contain p-1 img-product" />
@@ -1191,7 +1340,7 @@ function WishlistDrawer({
                       + Carrito
                     </button>
                     <button
-                      onClick={() => onToggleWishlist(p.id)}
+                      onClick={() => onRemoveWishlist(p.id)}
                       className="p-1.5 rounded-full hover:bg-red-50 text-[#0D5C3A] hover:text-red-500 transition-colors"
                       title="Quitar de lista de deseos"
                     >
@@ -1229,18 +1378,22 @@ function PartsModal({
 
   const categoryIndex = PART_CATEGORIES.indexOf(category)
   const isWheelCategory = categoryIndex === 0
-  const isCockpitCategory = category.title === 'Sillines y Cockpit'
   const products = isWheelCategory && selectedWheelType !== null
     ? WHEEL_VARIANTS[selectedWheelType]
     : category.products
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={onClose} />
+      <div className="modal-backdrop-animate fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] shadow-2xl overflow-hidden flex flex-col">
-          <div className="relative h-48 flex-shrink-0">
-            <img src={category.img} alt={category.title} className="w-full h-full object-cover img-hero" />
+        <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] shadow-2xl overflow-hidden flex flex-col modal-animate">
+          <div className="parts-modal__header relative h-48 flex-shrink-0 overflow-hidden">
+            <img
+              src={category.img}
+              alt={category.title}
+              className="w-full h-full object-cover img-hero"
+              onError={(event) => handleImageFallback(event, getPartImageFallback(category.title))}
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-[#1A1A1A] via-[#1A1A1A]/40 to-transparent" />
             <div className="absolute bottom-5 left-6 right-16">
               <span className="text-green-300 text-[10px] font-bold uppercase tracking-widest">Repuestos disponibles</span>
@@ -1259,7 +1412,7 @@ function PartsModal({
             </button>
           </div>
 
-          <div ref={contentRef} className="overflow-y-auto p-6">
+          <div ref={contentRef} className="parts-modal__content modal-scroll-region overflow-y-auto p-6">
             {isWheelCategory && selectedWheelType !== null && (
               <button
                 onClick={() => { setSelectedWheelType(null); contentRef.current?.scrollTo(0, 0) }}
@@ -1273,63 +1426,57 @@ function PartsModal({
                 ? `Elige entre estas 4 opciones de ${['llantas', 'rines', 'cámaras', 'kits tubeless'][selectedWheelType]}. Fotografías reales de referencia; comprueba la medida antes de comprar.`
                 : `${category.desc} Precios en pesos colombianos.`}
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="parts-modal__product-grid grid grid-cols-1 sm:grid-cols-2 gap-4">
               {products.map((product, productIndex) => {
                 const choosingType = isWheelCategory && selectedWheelType === null
                 const itemId = isWheelCategory
                   ? 2000 + selectedWheelType! * 10 + productIndex
                   : 1000 + categoryIndex * 10 + productIndex
                 const numericPrice = Number(product.price.replace(/\D/g, ''))
-                const wheelPhoto = isWheelCategory
-                  ? WHEEL_PHOTOS[choosingType ? productIndex : selectedWheelType!][choosingType ? 0 : productIndex]
-                  : null
-                const image = wheelPhoto?.img ?? product.img
+                const wheelTypeIndex = choosingType ? productIndex : selectedWheelType!
+                const image = isWheelCategory
+                  ? PART_IMAGE_LIBRARY.wheels[wheelTypeIndex][choosingType ? 0 : productIndex]
+                  : product.img
+                const imageFallback = isWheelCategory
+                  ? getWheelImageFallback(wheelTypeIndex)
+                  : getPartImageFallback(category.title)
                 const openWheelType = () => { setSelectedWheelType(productIndex); contentRef.current?.scrollTo(0, 0) }
                 return (
                   <div
                     key={product.name}
-                    className="group rounded-xl border border-gray-100 bg-[#F4F4F5] overflow-hidden flex flex-col hover:-translate-y-1 hover:border-[#0D5C3A]/30 hover:shadow-lg transition-all duration-300"
+                    className="parts-modal__product-card catalog-card group"
                   >
-                    <div className="relative h-48 overflow-hidden bg-white">
+                    <div className="parts-modal__product-media catalog-card__media relative">
                       {choosingType ? (
-                        <button onClick={openWheelType} className="w-full h-full cursor-pointer focus-visible:outline-2 focus-visible:outline-[#0D5C3A]" aria-label={`Ver opciones de ${['llantas', 'rines', 'cámaras', 'kits tubeless'][productIndex]}`}>
-                          <img src={image} alt="" className="w-full h-full object-contain p-3 img-product group-hover:scale-105 transition-transform duration-500" />
+                        <button onClick={openWheelType} className="catalog-card__image-button w-full h-full cursor-pointer focus-visible:outline-2 focus-visible:outline-[#0D5C3A]" aria-label={`Ver opciones de ${['llantas', 'rines', 'cámaras', 'kits tubeless'][productIndex]}`}>
+                          <img
+                            src={image}
+                            alt=""
+                            className="parts-modal__product-image catalog-card__image group-hover:scale-105"
+                            loading="lazy"
+                            decoding="async"
+                            onError={(event) => handleImageFallback(event, imageFallback)}
+                          />
                         </button>
-                      ) : isCockpitCategory ? (
-                        <img
-                          src={image}
-                          alt={product.name}
-                          className={`h-full w-full object-cover img-product group-hover:scale-105 transition-transform duration-500 ${
-                            productIndex === 0
-                              ? 'object-center'
-                              : productIndex === 2
-                                ? 'object-[center_58%]'
-                                : productIndex === 3
-                                  ? 'object-[center_52%]'
-                                  : 'object-center'
-                          }`}
-                        />
                       ) : (
                         <img
                           src={image}
                           alt={product.name}
-                          className="w-full h-full object-contain p-3 img-product group-hover:scale-105 transition-transform duration-500"
+                          className="parts-modal__product-image catalog-card__image group-hover:scale-105"
+                          loading="lazy"
+                          decoding="async"
+                          onError={(event) => handleImageFallback(event, imageFallback)}
                         />
                       )}
                     </div>
-                    <div className="p-4 flex flex-col flex-1">
-                      {wheelPhoto && (
-                        <a href={wheelPhoto.source} target="_blank" rel="noopener noreferrer" className="mb-2 text-[10px] text-gray-500 hover:text-[#0D5C3A] underline underline-offset-2">
-                          Foto: {wheelPhoto.credit}
-                        </a>
-                      )}
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#0D5C3A] mb-1">{choosingType ? '4 opciones disponibles' : 'Disponible'}</span>
+                    <div className="parts-modal__product-content catalog-card__content">
+                      <span className="catalog-card__eyebrow">{choosingType ? '4 opciones disponibles' : 'Disponible en tienda'}</span>
                       {choosingType ? (
-                        <button onClick={openWheelType} className="text-left text-sm font-bold text-[#1A1A1A] leading-snug mb-3 group-hover:text-[#0D5C3A] hover:underline focus-visible:outline-2 focus-visible:outline-[#0D5C3A]">
+                        <button onClick={openWheelType} className="catalog-card__title text-left group-hover:text-[#0D5C3A] hover:underline focus-visible:outline-2 focus-visible:outline-[#0D5C3A]">
                           {['Llantas', 'Rines', 'Cámaras', 'Kits tubeless'][productIndex]}
                         </button>
                       ) : (
-                        <p className="text-sm font-bold text-[#1A1A1A] leading-snug mb-3 group-hover:text-[#0D5C3A] transition-colors">{product.name}</p>
+                        <p className="catalog-card__title group-hover:text-[#0D5C3A] transition-colors">{product.name}</p>
                       )}
                       {choosingType ? (
                         <button
@@ -1398,22 +1545,57 @@ function ServiceModal({
   const [bike, setBike] = useState('')
   const [serviceType, setServiceType] = useState('preventivo')
   const [mileage, setMileage] = useState('')
+  const [lastInspection, setLastInspection] = useState('')
   const [mechanicalArea, setMechanicalArea] = useState('')
   const [issueDetails, setIssueDetails] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+  const [appointmentId, setAppointmentId] = useState<number | null>(null)
 
   if (!service) return null
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const minDateTime = new Date(Date.now() + 60_000 - new Date().getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 16)
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSubmitted(true)
+    setSubmitError('')
+    setSaving(true)
+    const observations = [
+      issueDetails.trim(),
+      mileage ? `Kilometraje aproximado: ${digitsOnly(mileage)} km` : '',
+      lastInspection ? `Última revisión: ${lastInspection}` : '',
+      mechanicalArea ? `Sistema: ${mechanicalArea}` : '',
+    ].filter(Boolean).join(' · ')
+    try {
+      const { id } = await apiRequest<{ id: number }>('/appointments', {
+        method: 'POST',
+        body: {
+          customerName: name.trim(),
+          phone: digitsOnly(phone),
+          bike: bike.trim(),
+          serviceName: service.title,
+          serviceType: service.title.toLowerCase().includes('mantenimiento') ? serviceType : mechanicalArea || null,
+          scheduledAt: new Date(date).toISOString(),
+          observations,
+        },
+      })
+      setSubmitted(true)
+      setAppointmentId(id)
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'No fue posible agendar la cita. Intenta de nuevo.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/60 z-40" onClick={onClose} />
+      <div className="modal-backdrop-animate fixed inset-0 bg-black/60 z-40" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+        <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden modal-animate">
           <div className="bg-[#0D5C3A] text-white px-6 py-5 flex items-center justify-between">
             <div>
               <p className="text-green-300 text-xs font-bold uppercase tracking-widest mb-1">Agendar Servicio</p>
@@ -1435,7 +1617,7 @@ function ServiceModal({
                   </svg>
                 </div>
                 <h4 className="font-black text-[#1A1A1A] text-lg mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>¡Cita agendada!</h4>
-                <p className="text-gray-500 text-sm">Nos comunicaremos contigo pronto para confirmar tu cita.</p>
+                <p className="text-gray-500 text-sm">Tu solicitud #{appointmentId} quedó registrada. Nos comunicaremos contigo para confirmar la cita.</p>
                 <button onClick={onClose} className="mt-5 bg-[#0D5C3A] text-white font-bold px-8 py-2.5 rounded-full text-sm hover:bg-[#1A8A5A] transition-colors">
                   Cerrar
                 </button>
@@ -1448,6 +1630,8 @@ function ServiceModal({
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
+                    minLength={2}
+                    maxLength={120}
                     placeholder="Tu nombre"
                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#0D5C3A] transition-colors"
                   />
@@ -1455,8 +1639,13 @@ function ServiceModal({
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Teléfono</label>
                   <input
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]{7,15}"
+                    maxLength={15}
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onKeyDown={handleDigitsOnlyKeyDown}
+                    onChange={(e) => setPhone(digitsOnly(e.target.value))}
                     required
                     placeholder="300 000 0000"
                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#0D5C3A] transition-colors"
@@ -1464,7 +1653,7 @@ function ServiceModal({
                 </div>
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Bicicleta / modelo</label>
-                  <input value={bike} onChange={(e) => setBike(e.target.value)} required placeholder="Marca y modelo" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#0D5C3A] transition-colors" />
+                  <input value={bike} onChange={(e) => setBike(e.target.value)} required minLength={2} maxLength={120} placeholder="Marca y modelo" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#0D5C3A] transition-colors" />
                 </div>
                 {service.title.toLowerCase().includes('mantenimiento') ? (
                   <>
@@ -1478,11 +1667,15 @@ function ServiceModal({
                     </div>
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Kilometraje aproximado</label>
-                      <input type="number" min="0" value={mileage} onChange={(e) => setMileage(e.target.value)} placeholder="Ej. 1200 km" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#0D5C3A] transition-colors" />
+                      <input type="text" inputMode="numeric" pattern="[0-9]*" value={mileage} onKeyDown={handleDigitsOnlyKeyDown} onChange={(e) => setMileage(digitsOnly(e.target.value))} placeholder="Ej. 1200 km" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#0D5C3A] transition-colors" />
                     </div>
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Última revisión (opcional)</label>
-                      <input type="date" value={issueDetails} onChange={(e) => setIssueDetails(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#0D5C3A] transition-colors" />
+                      <input type="date" value={lastInspection} onChange={(e) => setLastInspection(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#0D5C3A] transition-colors" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Observaciones (opcional)</label>
+                      <textarea value={issueDetails} onChange={(e) => setIssueDetails(e.target.value)} maxLength={500} rows={2} placeholder="Cuéntanos qué necesitas revisar" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#0D5C3A] transition-colors" />
                     </div>
                   </>
                 ) : service.title.toLowerCase().includes('reparación') ? (
@@ -1515,19 +1708,21 @@ function ServiceModal({
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Fecha deseada</label>
                   <input
-                    type="date"
+                    type="datetime-local"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
                     required
-                    min={new Date().toISOString().split('T')[0]}
+                    min={minDateTime}
                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#0D5C3A] transition-colors"
                   />
                 </div>
+                {submitError && <p role="alert" className="text-sm text-red-600">{submitError}</p>}
                 <button
                   type="submit"
-                  className="w-full bg-[#0D5C3A] hover:bg-[#1A8A5A] text-white font-black py-3 rounded-full text-sm tracking-wide transition-colors"
+                  disabled={saving}
+                  className="w-full bg-[#0D5C3A] hover:bg-[#1A8A5A] disabled:opacity-60 disabled:cursor-wait text-white font-black py-3 rounded-full text-sm tracking-wide transition-all duration-200 hover:-translate-y-0.5"
                 >
-                  Confirmar Cita
+                  {saving ? 'Agendando…' : 'Confirmar Cita'}
                 </button>
               </form>
             )}
@@ -1535,6 +1730,255 @@ function ServiceModal({
         </div>
       </div>
     </>
+  )
+}
+
+interface ChatWidgetMessage {
+  id: number | string
+  sender: 'user' | 'assistant'
+  message: string
+  createdAt: string
+}
+
+const OPEN_CHAT_EVENT = 'bike-store:open-chat'
+
+function FloatingChatWidget({ user }: { user: AuthUser | null }) {
+  const [sessionId, setSessionId] = useState('')
+  const [isOpen, setIsOpen] = useState(false)
+  const [isDismissed, setIsDismissed] = useState(false)
+  const [messages, setMessages] = useState<ChatWidgetMessage[]>([])
+  const [message, setMessage] = useState('')
+  const [loadingHistory, setLoadingHistory] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [showEscalation, setShowEscalation] = useState(false)
+  const [escalating, setEscalating] = useState(false)
+  const [offerEscalation, setOfferEscalation] = useState(true)
+  const [error, setError] = useState('')
+  const [contact, setContact] = useState({ name: '', email: '', phone: '', request: '' })
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const openChat = () => {
+      setIsDismissed(false)
+      setIsOpen(true)
+    }
+    window.addEventListener(OPEN_CHAT_EVENT, openChat)
+    return () => window.removeEventListener(OPEN_CHAT_EVENT, openChat)
+  }, [])
+
+  useEffect(() => {
+    try {
+      const savedSessionId = window.localStorage.getItem('bs-bike-store-chat-session')
+      const nextSessionId = savedSessionId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(savedSessionId)
+        ? savedSessionId
+        : window.crypto.randomUUID()
+      window.localStorage.setItem('bs-bike-store-chat-session', nextSessionId)
+      setSessionId(nextSessionId)
+    } catch (storageError) {
+      console.error('No fue posible preparar la sesión persistente del chat.', storageError)
+      setError('No se pudo inicializar el chat en este navegador.')
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isOpen || !sessionId) return
+    let active = true
+    setLoadingHistory(true)
+    setError('')
+    void apiRequest<{ items: ChatWidgetMessage[] }>(`/chat/history/${encodeURIComponent(sessionId)}`)
+      .then(({ items }) => {
+        if (active) setMessages(items)
+      })
+      .catch((historyError: unknown) => {
+        if (active) setError(historyError instanceof Error ? historyError.message : 'No fue posible cargar el historial del chat.')
+      })
+      .finally(() => {
+        if (active) setLoadingHistory(false)
+      })
+    return () => { active = false }
+  }, [isOpen, sessionId, user?.id])
+
+  useEffect(() => {
+    if (!user) return
+    setContact((previous) => ({
+      ...previous,
+      name: previous.name || user.name,
+      email: previous.email || user.email,
+    }))
+  }, [user])
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [messages, sending, showEscalation, isOpen])
+
+  const sendMessage = async (event: React.FormEvent) => {
+    event.preventDefault()
+    const text = message.trim()
+    if (!text || !sessionId || sending || loadingHistory) return
+    setSending(true)
+    setError('')
+    try {
+      const result = await apiRequest<{
+        userMessage: ChatWidgetMessage
+        assistantMessage: ChatWidgetMessage
+        offerEscalation: boolean
+      }>('/chat/message', { method: 'POST', body: { sessionId, message: text } })
+      setMessages((previous) => [...previous, result.userMessage, result.assistantMessage])
+      setOfferEscalation(result.offerEscalation)
+      setMessage('')
+    } catch (sendError) {
+      setError(sendError instanceof Error ? sendError.message : 'No fue posible enviar el mensaje.')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const sendEscalation = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!sessionId || escalating) return
+    setEscalating(true)
+    setError('')
+    try {
+      const result = await apiRequest<{ message: string; createdAt: string }>('/chat/escalation', {
+        method: 'POST',
+        body: { sessionId, ...contact },
+      })
+      setMessages((previous) => [
+        ...previous,
+        { id: `escalation-user-${Date.now()}`, sender: 'user', message: `Solicitud de asesor: ${contact.request.trim()}`, createdAt: result.createdAt },
+        { id: `escalation-assistant-${Date.now()}`, sender: 'assistant', message: result.message, createdAt: result.createdAt },
+      ])
+      setShowEscalation(false)
+      setOfferEscalation(false)
+    } catch (escalationError) {
+      setError(escalationError instanceof Error ? escalationError.message : 'No fue posible enviar la solicitud al asesor.')
+    } finally {
+      setEscalating(false)
+    }
+  }
+
+  const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none transition-colors focus:border-[#0D5C3A] focus:ring-2 focus:ring-[#0D5C3A]/15'
+
+  if (isDismissed) return null
+
+  return (
+    <div className="fixed bottom-4 right-4 z-[130] flex flex-col items-end gap-3">
+      {isOpen && (
+        <section
+          aria-label="Chat de asesoría Bike Store"
+          className="bike-chat-window flex w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
+          style={{ height: 'min(650px, calc(100dvh - 7rem))' }}
+        >
+          <header className="flex items-center justify-between bg-[#0D5C3A] px-4 py-3 text-white">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15" aria-hidden="true">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z" />
+                </svg>
+              </span>
+              <div>
+                <h2 className="text-sm font-bold">Asesor Bike Store</h2>
+                <p className="flex items-center gap-1.5 text-xs text-green-100"><span className="h-2 w-2 rounded-full bg-green-300" />En línea · respuesta automática</p>
+              </div>
+            </div>
+            <button type="button" onClick={() => setIsOpen(false)} aria-label="Cerrar chat" className="rounded-full p-2 text-white/90 transition-colors hover:bg-white/15">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="m18 6-12 12M6 6l12 12" /></svg>
+            </button>
+          </header>
+
+          <div className="flex min-h-0 flex-1 flex-col bg-[#F8FAF9]">
+            <div className="flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
+              <div className="max-w-[90%] rounded-2xl rounded-tl-sm bg-white px-3.5 py-3 text-sm text-gray-700 shadow-sm">
+                ¡Hola! Puedo orientarte sobre bicicletas y precios, pedidos, repuestos, pagos y citas de taller.
+              </div>
+              {loadingHistory && <p className="text-center text-xs text-gray-500">Cargando conversación…</p>}
+              {messages.map((chatMessage) => (
+                <div key={chatMessage.id} className={`flex ${chatMessage.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <p className={`max-w-[90%] whitespace-pre-wrap rounded-2xl px-3.5 py-3 text-sm leading-relaxed ${
+                    chatMessage.sender === 'user'
+                      ? 'rounded-tr-sm bg-[#0D5C3A] text-white'
+                      : 'rounded-tl-sm bg-white text-gray-700 shadow-sm'
+                  }`}>
+                    {chatMessage.message}
+                  </p>
+                </div>
+              ))}
+              {sending && <p className="text-xs text-gray-500">El asistente está escribiendo…</p>}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {offerEscalation && !showEscalation && (
+              <button
+                type="button"
+                onClick={() => setShowEscalation(true)}
+                className="mx-4 mb-2 self-start rounded-full border border-[#0D5C3A] px-3 py-1.5 text-xs font-bold text-[#0D5C3A] transition-colors hover:bg-[#0D5C3A]/5"
+              >
+                Solicitar asesor humano
+              </button>
+            )}
+
+            {showEscalation ? (
+              <form onSubmit={sendEscalation} className="space-y-2 border-t border-gray-100 bg-white p-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <input className={inputClass} aria-label="Nombre para el asesor" required minLength={2} maxLength={120} placeholder="Nombre" value={contact.name} onChange={(event) => setContact((previous) => ({ ...previous, name: event.target.value }))} />
+                  <input className={inputClass} aria-label="Correo para el asesor" required type="email" maxLength={190} placeholder="Correo" value={contact.email} onChange={(event) => setContact((previous) => ({ ...previous, email: event.target.value }))} />
+                </div>
+                <input className={inputClass} aria-label="Teléfono para el asesor" required type="tel" inputMode="numeric" pattern="[0-9]{7,15}" maxLength={15} placeholder="Teléfono (solo números)" value={contact.phone} onKeyDown={handleDigitsOnlyKeyDown} onChange={(event) => setContact((previous) => ({ ...previous, phone: digitsOnly(event.target.value) }))} />
+                <textarea className={inputClass} aria-label="Motivo de contacto con asesor" required minLength={2} maxLength={1000} rows={2} placeholder="¿En qué puede ayudarte el asesor?" value={contact.request} onChange={(event) => setContact((previous) => ({ ...previous, request: event.target.value }))} />
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setShowEscalation(false)} className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600">Cancelar</button>
+                  <button type="submit" disabled={escalating} className="flex-1 rounded-xl bg-[#0D5C3A] px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-[#1A8A5A] disabled:opacity-60">
+                    {escalating ? 'Enviando…' : 'Enviar solicitud'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={sendMessage} className="flex items-center gap-2 border-t border-gray-100 bg-white p-3">
+                <input
+                  aria-label="Escribe tu mensaje"
+                  className={inputClass}
+                  maxLength={2000}
+                  placeholder="Escribe tu consulta…"
+                  value={message}
+                  onChange={(event) => setMessage(event.target.value)}
+                  disabled={!sessionId || sending || loadingHistory}
+                />
+                <button type="submit" aria-label="Enviar mensaje" disabled={!message.trim() || !sessionId || sending || loadingHistory} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#0D5C3A] text-white transition-colors hover:bg-[#1A8A5A] disabled:cursor-not-allowed disabled:opacity-50">
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
+                </button>
+              </form>
+            )}
+            <p className="bg-white px-3 pb-2 text-center text-[10px] text-gray-500">La conversación se guarda para dar seguimiento a tu consulta.</p>
+            {error && <p role="alert" className="bg-white px-3 pb-3 text-center text-xs text-red-600">{error}</p>}
+          </div>
+        </section>
+      )}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          aria-label={isOpen ? 'Cerrar asesoría' : 'Solicitar asesoría'}
+          aria-expanded={isOpen}
+          onClick={() => setIsOpen((open) => !open)}
+          className="flex items-center gap-2 rounded-full bg-[#0D5C3A] px-5 py-3.5 font-bold text-white shadow-xl transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#1A8A5A] hover:shadow-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0D5C3A]"
+        >
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z" />
+          </svg>
+          <span>{isOpen ? 'Cerrar chat' : 'Solicitar asesoría'}</span>
+        </button>
+        <button
+          type="button"
+          aria-label="Ocultar el asistente de chat"
+          title="Ocultar el asistente"
+          onClick={() => setIsDismissed(true)}
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-gray-600 shadow-lg transition-colors hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0D5C3A]"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+            <path d="m18 6-12 12M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -1809,110 +2253,6 @@ function CookiesModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-const PRIVACY_CONSENT_KEY = 'bs-bikestore-privacy-consent-v1'
-
-function PrivacyConsentGate({
-  onAccept,
-  onOpenTerms,
-  onOpenPrivacy,
-}: {
-  onAccept: () => void
-  onOpenTerms: () => void
-  onOpenPrivacy: () => void
-}) {
-  const [confirmed, setConfirmed] = useState(false)
-
-  useEffect(() => {
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
-  }, [])
-
-  return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#1A1A1A]/80 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="privacy-consent-title"
-      aria-describedby="privacy-consent-description"
-    >
-      <div className="modal-animate w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="bg-black px-6 py-5 sm:px-8">
-          <div className="flex items-center gap-4">
-            <BSLogo size={52} />
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-gray-100">Bicicenter Bikestore</p>
-              <h2 id="privacy-consent-title" className="font-display mt-1 text-xl font-black text-gray-100 sm:text-2xl">
-                Tu privacidad es importante
-              </h2>
-            </div>
-          </div>
-        </div>
-
-        <div className="px-6 py-6 sm:px-8">
-          <p id="privacy-consent-description" className="text-sm leading-relaxed text-gray-600">
-            Antes de ingresar, queremos informarte cómo usamos y protegemos tus datos personales al navegar,
-            crear una cuenta o realizar un pedido.
-          </p>
-
-          <div className="my-5 space-y-3 rounded-xl border border-gray-100 bg-[#F4F4F5] p-4">
-            {[
-              'Usamos tus datos para gestionar pedidos, entregas, soporte y facturación.',
-              'Protegemos tu información y no la vendemos a terceros.',
-              'Puedes consultar, actualizar o solicitar la eliminación de tus datos.',
-            ].map((item) => (
-              <div key={item} className="flex gap-3">
-                <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-[#0D5C3A] text-white" aria-hidden="true">
-                  <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
-                    <path d="m5 12 4 4L19 6" />
-                  </svg>
-                </span>
-                <p className="text-sm leading-relaxed text-gray-700">{item}</p>
-              </div>
-            ))}
-          </div>
-
-          <p className="text-sm leading-relaxed text-gray-600">
-            Revisa nuestros{' '}
-            <button type="button" onClick={onOpenTerms} className="font-bold text-[#0D5C3A] underline underline-offset-2 hover:text-[#1A8A5A]">
-              Términos y Condiciones
-            </button>{' '}
-            y la{' '}
-            <button type="button" onClick={onOpenPrivacy} className="font-bold text-[#0D5C3A] underline underline-offset-2 hover:text-[#1A8A5A]">
-              Política de Privacidad
-            </button>
-            .
-          </p>
-
-          <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-4 transition-colors hover:border-[#0D5C3A]/40">
-            <input
-              type="checkbox"
-              checked={confirmed}
-              onChange={(event) => setConfirmed(event.target.checked)}
-              className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#0D5C3A]"
-            />
-            <span className="text-sm font-medium leading-relaxed text-gray-700">
-              He leído y acepto los Términos y Condiciones y la Política de Privacidad.
-            </span>
-          </label>
-
-          <button
-            type="button"
-            disabled={!confirmed}
-            onClick={onAccept}
-            className="mt-5 w-full rounded-full bg-[#0D5C3A] px-6 py-3.5 text-sm font-black text-white transition-all hover:bg-[#1A8A5A] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Aceptar y entrar
-          </button>
-
-          <p className="mt-3 text-center text-xs leading-relaxed text-gray-400">
-            Debes aceptar para acceder a la tienda.
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ─── Checkout ─────────────────────────────────────────────────────────────────
 
 type PayMethod = 'efectivo'
@@ -1921,13 +2261,11 @@ type CheckoutStep = 'envio' | 'pago' | 'confirmacion'
 function CheckoutModal({
   items,
   user,
-  token,
   onClose,
   onSuccess,
 }: {
   items: CartItem[]
   user: AuthUser
-  token: string
   onClose: () => void
   onSuccess: (order: PersistedOrder) => void
 }) {
@@ -1978,7 +2316,6 @@ function CheckoutModal({
     try {
       const order = await apiRequest<PersistedOrder>('/orders', {
         method: 'POST',
-        token,
         body: {
           items: items.map((item) => ({ productId: item.id, quantity: item.qty })),
           paymentMethod: 'cash',
@@ -2089,7 +2426,7 @@ function CheckoutModal({
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Teléfono *</label>
-                      <input className={inputCls} type="tel" value={form.telefono} onChange={e => setForm(f => ({...f, telefono: e.target.value}))} placeholder="310 234 5678" />
+                      <input className={inputCls} type="tel" inputMode="numeric" pattern="[0-9]{7,15}" maxLength={15} value={form.telefono} onKeyDown={handleDigitsOnlyKeyDown} onChange={e => setForm(f => ({...f, telefono: digitsOnly(e.target.value)}))} placeholder="3102345678" />
                     </div>
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Dirección de entrega *</label>
@@ -2247,55 +2584,93 @@ function CheckoutModal({
               const totalConIva = invoice.total
               const payLabel = `Efectivo · ${invoice.paymentPoint}`
 
-              const handlePrint = () => window.print()
-              const handleDownload = async () => {
-                const el = document.getElementById('factura-bs')
-                if (!el) return
+              const handleDownload = () => {
                 try {
-                  const logoResponse = await fetch(logoImg)
-                  if (!logoResponse.ok) throw new Error('No se pudo cargar el logo de la tienda.')
-                  const logoBlob = await logoResponse.blob()
-                  const logoData = await new Promise<string>((resolve, reject) => {
-                    const reader = new FileReader()
-                    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('No se pudo preparar el logo.'))
-                    reader.onerror = () => reject(reader.error ?? new Error('No se pudo leer el logo.'))
-                    reader.readAsDataURL(logoBlob)
+                  const pdf = new jsPDF({ unit: 'mm', format: 'a4' })
+                  const pageWidth = pdf.internal.pageSize.getWidth()
+                  const margin = 16
+                  let y = 20
+                  const formatCop = (amount: number) => `$${amount.toLocaleString('es-CO')} COP`
+
+                  pdf.setFillColor(13, 92, 58)
+                  pdf.rect(0, 0, pageWidth, 38, 'F')
+                  pdf.setTextColor(255, 255, 255)
+                  pdf.setFont('helvetica', 'bold')
+                  pdf.setFontSize(18)
+                  pdf.text('BS BIKE STORE', margin, y)
+                  pdf.setFontSize(10)
+                  pdf.setFont('helvetica', 'normal')
+                  pdf.text('NIT: 900.123.456-7', margin, y + 7)
+                  pdf.text('FACTURA DE VENTA', pageWidth - margin, y, { align: 'right' })
+                  pdf.setFont('helvetica', 'bold')
+                  pdf.text(invoice.number, pageWidth - margin, y + 7, { align: 'right' })
+                  pdf.setFont('helvetica', 'normal')
+                  pdf.text(invoiceDate, pageWidth - margin, y + 14, { align: 'right' })
+                  pdf.setTextColor(26, 26, 26)
+                  y = 50
+
+                  pdf.setFont('helvetica', 'bold')
+                  pdf.setFontSize(11)
+                  pdf.text('CLIENTE', margin, y)
+                  pdf.text('ENVÍO A', pageWidth / 2, y)
+                  pdf.setFont('helvetica', 'normal')
+                  pdf.setFontSize(9)
+                  pdf.text(pdf.splitTextToSize(`${user.name}\n${user.email}${form.telefono ? `\n${form.telefono}` : ''}`, 80), margin, y + 6)
+                  pdf.text(pdf.splitTextToSize(`${form.direccion}\n${form.ciudad}${form.departamento ? `, ${form.departamento}` : ''}\nEntrega: 3-7 días hábiles`, 80), pageWidth / 2, y + 6)
+                  y += 30
+
+                  pdf.setFillColor(244, 244, 245)
+                  pdf.rect(margin, y, pageWidth - margin * 2, 9, 'F')
+                  pdf.setFont('helvetica', 'bold')
+                  pdf.setFontSize(8)
+                  pdf.text('PRODUCTO', margin + 2, y + 6)
+                  pdf.text('CANT.', 126, y + 6, { align: 'center' })
+                  pdf.text('PRECIO UNITARIO', 157, y + 6, { align: 'right' })
+                  pdf.text('SUBTOTAL', pageWidth - margin - 2, y + 6, { align: 'right' })
+                  y += 9
+
+                  pdf.setFont('helvetica', 'normal')
+                  savedOrder.items.forEach((item) => {
+                    const nameLines = pdf.splitTextToSize(item.name, 76)
+                    const rowHeight = Math.max(9, nameLines.length * 4.5 + 4)
+                    if (y + rowHeight > 245) {
+                      pdf.addPage()
+                      y = 20
+                    }
+                    pdf.setDrawColor(225, 228, 230)
+                    pdf.line(margin, y + rowHeight, pageWidth - margin, y + rowHeight)
+                    pdf.text(nameLines, margin + 2, y + 6)
+                    pdf.text(String(item.quantity), 126, y + 6, { align: 'center' })
+                    pdf.text(formatCop(item.unitPrice), 157, y + 6, { align: 'right' })
+                    pdf.text(formatCop(item.unitPrice * item.quantity), pageWidth - margin - 2, y + 6, { align: 'right' })
+                    y += rowHeight
                   })
-                  const invoiceCopy = el.cloneNode(true) as HTMLElement
-                  const logo = invoiceCopy.querySelector('img')
-                  if (logo) {
-                    logo.src = logoData
-                    logo.style.width = '36px'
-                    logo.style.height = '36px'
-                    logo.style.objectFit = 'contain'
+
+                  if (y > 245) {
+                    pdf.addPage()
+                    y = 20
                   }
-                  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Factura ${invoice.number}</title><style>body{font:14px Arial,sans-serif;max-width:800px;margin:32px auto;padding:24px;color:#1a1a1a;border:1px solid #e5e7eb;border-radius:16px}h1,h2{font-weight:900}table{width:100%;border-collapse:collapse}td,th{padding:10px 8px;border-bottom:1px solid #e5e7eb;font-size:13px}th{text-align:left;color:#0D5C3A;font-size:11px;text-transform:uppercase}.invoice-header{background:#0D5C3A!important;color:white!important;padding:20px;border-radius:12px}.invoice-header img{width:36px;height:36px;object-fit:contain}@media print{body{margin:0;border:0}}</style></head><body>${invoiceCopy.innerHTML}</body></html>`
-                  const blob = new Blob([html], { type: 'text/html' })
-                  const url = URL.createObjectURL(blob)
-                  const a = document.createElement('a')
-                  a.href = url
-                  a.download = `Factura-${invoice.number}.html`
-                  a.click()
-                  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+                  y += 10
+                  pdf.setFontSize(9)
+                  pdf.text(`Subtotal: ${formatCop(subtotal)}`, pageWidth - margin, y, { align: 'right' })
+                  y += 7
+                  pdf.text(`IVA 19%: ${formatCop(iva)}`, pageWidth - margin, y, { align: 'right' })
+                  y += 8
+                  pdf.setFont('helvetica', 'bold')
+                  pdf.setFontSize(12)
+                  pdf.setTextColor(13, 92, 58)
+                  pdf.text(`TOTAL: ${formatCop(totalConIva)}`, pageWidth - margin, y, { align: 'right' })
+                  y += 8
+                  pdf.setFont('helvetica', 'normal')
+                  pdf.setFontSize(9)
+                  pdf.setTextColor(80, 80, 80)
+                  pdf.text(`Pedido confirmado · Pago: ${payLabel} · pendiente de pago`, margin, y)
+                  pdf.setFontSize(8)
+                  pdf.text('Comprobante de compra. Consérvalo para trámites de garantía o devolución.', margin, 282)
+                  pdf.save(`Factura-${invoice.number}.pdf`)
                 } catch (error) {
-                  window.alert(error instanceof Error ? error.message : 'No fue posible descargar la factura.')
+                  window.alert(error instanceof Error ? error.message : 'No fue posible descargar la factura PDF.')
                 }
-              }
-              const handleInvoiceExcel = () => {
-                downloadXlsx([
-                  ['Factura', invoice.number],
-                  ['Fecha', invoiceDate],
-                  ['Cliente', user.name],
-                  ['Correo', user.email],
-                  ['Método de pago', payLabel],
-                  [],
-                  ['Producto', 'Cantidad', 'Precio unitario (COP)', 'Subtotal (COP)'],
-                  ...savedOrder.items.map((item) => [item.name, item.quantity, item.unitPrice, item.unitPrice * item.quantity]),
-                  [],
-                  ['Subtotal', subtotal],
-                  ['IVA', iva],
-                  ['Total', totalConIva],
-                ], `Factura-${invoice.number}`)
               }
 
               return (
@@ -2306,8 +2681,8 @@ function CheckoutModal({
                       <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
                     </div>
                     <div>
-                      <h3 className="text-xl font-black text-[#1A1A1A]" style={{fontFamily:'Montserrat,sans-serif'}}>¡Pedido guardado!</h3>
-                      <p className="text-gray-500 text-sm">Gracias, {user.name.split(' ')[0]}. El pago en efectivo está pendiente de confirmación.</p>
+                      <h3 className="text-xl font-black text-[#1A1A1A]" style={{fontFamily:'Montserrat,sans-serif'}}>¡Compra confirmada!</h3>
+                      <p className="text-gray-500 text-sm">Gracias, {user.name.split(' ')[0]}. Tu pedido está confirmado y en preparación. El pago en efectivo queda pendiente hasta recibirlo.</p>
                     </div>
                   </div>
 
@@ -2380,12 +2755,12 @@ function CheckoutModal({
                         <span>${iva.toLocaleString('es-CO')} COP</span>
                       </div>
                       <div className="flex justify-between font-black text-[#0D5C3A] text-sm pt-1.5 border-t border-gray-300">
-                        <span>TOTAL PAGADO</span>
+                        <span>TOTAL DEL PEDIDO</span>
                         <span>${totalConIva.toLocaleString('es-CO')} COP</span>
                       </div>
                       <div className="flex justify-between text-gray-500 text-[11px] pt-1">
                         <span>Método de pago</span>
-                        <span className="font-semibold">{payLabel} · pendiente</span>
+                        <span className="font-semibold">{payLabel} · pendiente de pago</span>
                       </div>
                     </div>
 
@@ -2398,21 +2773,11 @@ function CheckoutModal({
                   {/* Action buttons */}
                   <div className="flex gap-3">
                     <button
-                      onClick={handlePrint}
-                      className="flex-1 border-2 border-[#0D5C3A] text-[#0D5C3A] font-bold py-3 rounded-full text-sm hover:bg-[#0D5C3A]/5 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-                      Imprimir
-                    </button>
-                    <button
                       onClick={handleDownload}
-                      className="flex-1 border-2 border-[#0D5C3A] text-[#0D5C3A] font-bold py-3 rounded-full text-sm hover:bg-[#0D5C3A]/5 transition-colors flex items-center justify-center gap-2"
+                      className="w-full border-2 border-[#0D5C3A] text-[#0D5C3A] font-bold py-3 rounded-full text-sm hover:bg-[#0D5C3A]/5 transition-colors flex items-center justify-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-                      Descargar
-                    </button>
-                    <button onClick={handleInvoiceExcel} className="flex-1 border-2 border-[#0D5C3A] text-[#0D5C3A] font-bold py-3 rounded-full text-sm hover:bg-[#0D5C3A]/5 transition-colors">
-                      Excel
+                      Descargar factura PDF
                     </button>
                   </div>
 
@@ -2454,21 +2819,21 @@ interface AuthUser {
   role: 'client' | 'admin'
 }
 
-function MyOrdersModal({ token, onClose }: { token: string; onClose: () => void }) {
+function MyOrdersModal({ onClose }: { onClose: () => void }) {
   const [orders, setOrders] = useState<CustomerOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    void apiRequest<CustomerOrder[]>('/orders/mine', { token })
+    void apiRequest<CustomerOrder[]>('/orders/mine')
       .then(setOrders)
       .catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : 'No fue posible cargar tus pedidos.'))
       .finally(() => setLoading(false))
-  }, [token])
+  }, [])
 
   const statusLabels: Record<string, string> = {
     pending: 'Pendiente',
-    processing: 'En proceso',
+    processing: 'Confirmado · en preparación',
     shipped: 'Enviado',
     delivered: 'Entregado',
     cancelled: 'Cancelado',
@@ -2523,7 +2888,7 @@ function AuthModal({
   onOpenLegal,
 }: {
   onClose: () => void
-  onLogin: (user: AuthUser, token: string) => void
+  onLogin: (user: AuthUser) => void
   onOpenLegal: (section: 'terminos' | 'privacidad') => void
 }) {
   const [tab, setTab] = useState<'login' | 'register'>('login')
@@ -2552,14 +2917,15 @@ function AuthModal({
     if (!email.trim() || !password) return fail('Ingresa tu correo y contraseña')
     setSubmitting(true)
     try {
-      const session = await apiRequest<{ user: AuthUser; token: string }>('/auth/login', {
+      const session = await apiRequest<{ user: AuthUser }>('/auth/login', {
         method: 'POST',
         body: { email: email.trim(), password },
       })
       if (session.user.role !== role) {
+        await apiRequest<void>('/auth/logout', { method: 'POST' })
         throw new Error(role === 'admin' ? 'Esta cuenta no tiene permisos de administrador.' : 'Usa el acceso de administrador para esta cuenta.')
       }
-      onLogin(session.user, session.token)
+      onLogin(session.user)
     } catch (err) {
       fail(err instanceof Error ? err.message : 'No fue posible iniciar sesión.')
     } finally {
@@ -2576,11 +2942,11 @@ function AuthModal({
     if (!termsAccepted) return fail('Debes aceptar los términos y la política de privacidad')
     setSubmitting(true)
     try {
-      const session = await apiRequest<{ user: AuthUser; token: string }>('/auth/register', {
+      const session = await apiRequest<{ user: AuthUser }>('/auth/register', {
         method: 'POST',
         body: { name: name.trim(), email: email.trim(), password, termsAccepted },
       })
-      onLogin(session.user, session.token)
+      onLogin(session.user)
     } catch (err) {
       fail(err instanceof Error ? err.message : 'No fue posible crear la cuenta.')
     } finally {
@@ -2816,7 +3182,7 @@ function AuthModal({
 
 // ─── Admin Login Page ─────────────────────────────────────────────────────────
 
-function AdminLoginPage({ onSuccess, onBack }: { onSuccess: (user: AuthUser, token: string) => void; onBack: () => void }) {
+function AdminLoginPage({ onSuccess, onBack }: { onSuccess: (user: AuthUser) => void; onBack: () => void }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -2828,12 +3194,15 @@ function AdminLoginPage({ onSuccess, onBack }: { onSuccess: (user: AuthUser, tok
     setLoading(true)
     setError('')
     try {
-      const session = await apiRequest<{ user: AuthUser; token: string }>('/auth/login', {
+      const session = await apiRequest<{ user: AuthUser }>('/auth/login', {
         method: 'POST',
         body: { email: email.trim(), password },
       })
-      if (session.user.role !== 'admin') throw new Error('Esta cuenta no tiene permisos de administrador.')
-      onSuccess(session.user, session.token)
+      if (session.user.role !== 'admin') {
+        await apiRequest<void>('/auth/logout', { method: 'POST' })
+        throw new Error('Esta cuenta no tiene permisos de administrador.')
+      }
+      onSuccess(session.user)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No fue posible iniciar sesión.')
       setLoading(false)
@@ -2966,7 +3335,55 @@ function AdminLoginPage({ onSuccess, onBack }: { onSuccess: (user: AuthUser, tok
 
 // ─── Admin Panel ──────────────────────────────────────────────────────────────
 
-type AdminSection = 'dashboard' | 'productos' | 'ofertas' | 'inventario' | 'usuarios' | 'clientes' | 'reportes' | 'pedidos' | 'resenas'
+type AdminSection = 'dashboard' | 'productos' | 'ofertas' | 'inventario' | 'usuarios' | 'clientes' | 'reportes' | 'pedidos' | 'resenas' | 'taller'
+type DashboardOrdersFilter = 'todos' | 'por-atender'
+type DashboardActiveFilter = 'all' | 'active'
+type DashboardSalesFilter = 'all' | 'delivered'
+type AppointmentFilter = 'all' | 'pending' | 'in_progress' | 'completed' | 'cancelled'
+type AppointmentStatus = AppointmentFilter
+
+interface ServiceAppointment {
+  id: number
+  customerName: string
+  phone: string
+  bike: string
+  serviceName: string
+  serviceType: string | null
+  scheduledAt: string
+  status: AppointmentStatus
+  observations: string
+  createdAt: string
+}
+
+const ADMIN_ROUTE_SECTIONS: Record<string, AdminSection> = {
+  '/admin/pedidos': 'pedidos',
+  '/admin/reportes': 'reportes',
+  '/admin/clientes': 'clientes',
+  '/admin/inventario': 'inventario',
+  '/admin/taller': 'taller',
+}
+
+function getAdminSectionFromPath(pathname: string): AdminSection {
+  return ADMIN_ROUTE_SECTIONS[pathname] ?? 'dashboard'
+}
+
+function getDashboardActiveFilter(search: string, key: 'status'): DashboardActiveFilter {
+  return new URLSearchParams(search).get(key) === 'active' ? 'active' : 'all'
+}
+
+function getDashboardSalesFilter(search: string): DashboardSalesFilter {
+  return new URLSearchParams(search).get('view') === 'delivered' ? 'delivered' : 'all'
+}
+
+function getDashboardOrdersFilter(search: string): DashboardOrdersFilter {
+  const filter = new URLSearchParams(search).get('filter')
+  return filter === 'pending' || filter === 'por-atender' ? 'por-atender' : 'todos'
+}
+
+function getAppointmentFilter(search: string): AppointmentFilter {
+  const status = new URLSearchParams(search).get('status')
+  return status === 'pending' || status === 'in_progress' || status === 'completed' || status === 'cancelled' ? status : 'all'
+}
 
 const MOCK_ORDERS = [
   { id: 'BS-001', client: 'Andrés Morales', email: 'andres@mail.com', product: 'GW Hawk MTB 29 12V', total: 17400000, status: 'entregado', date: '2026-09-10', city: 'Medellín', payMethod: 'tarjeta' },
@@ -2986,7 +3403,7 @@ interface AdminClient {
   id: number; name: string; email: string; phone: string; orders: number; totalSpent: number; lastOrder: string | null; active: boolean
 }
 interface AdminOffer {
-  id: number; title: string; discount: number; code: string; validUntil: string | null; active: boolean
+  id: number; title: string; discount: number; code: string; validFrom: string; validUntil: string | null; productIds: number[]; active: boolean
 }
 interface AdminReview {
   id: number; productId: number; productName: string; rating: number; comment: string
@@ -3004,15 +3421,138 @@ const INIT_CLIENTS: AdminClient[] = [
   { id: 4, name: 'Sofía Vargas', email: 'sofia@mail.com', phone: '318 321 0987', orders: 2, totalSpent: 35400000, lastOrder: '2026-09-01', active: true },
 ]
 
-function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) {
-  const [section, setSection] = useState<AdminSection>('dashboard')
+const ADMIN_PAGE_SIZE = 10
+
+function AdminPagination({ page, total, onChange }: { page: number; total: number; onChange: (page: number) => void }) {
+  const pageCount = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE))
+  if (total <= ADMIN_PAGE_SIZE) return null
+
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3 text-xs text-gray-500">
+      <span>{total} registros · página {page} de {pageCount}</span>
+      <div className="flex gap-2">
+        <button type="button" onClick={() => onChange(page - 1)} disabled={page <= 1} className="rounded-lg border border-gray-200 px-3 py-1.5 font-semibold disabled:cursor-not-allowed disabled:opacity-40">Anterior</button>
+        <button type="button" onClick={() => onChange(page + 1)} disabled={page >= pageCount} className="rounded-lg border border-gray-200 px-3 py-1.5 font-semibold disabled:cursor-not-allowed disabled:opacity-40">Siguiente</button>
+      </div>
+    </div>
+  )
+}
+
+function AdminPanel({
+  onClose,
+  darkMode,
+  onToggleTheme,
+}: {
+  onClose: () => void
+  darkMode: boolean
+  onToggleTheme: () => void
+}) {
+  const [section, setSection] = useState<AdminSection>(() => getAdminSectionFromPath(window.location.pathname))
+  const [filtroEstado, setFiltroEstado] = useState<DashboardOrdersFilter>(() =>
+    getDashboardOrdersFilter(window.location.search),
+  )
+  const [clientsFilter, setClientsFilter] = useState<DashboardActiveFilter>(() =>
+    getDashboardActiveFilter(window.location.search, 'status'),
+  )
+  const [inventoryFilter, setInventoryFilter] = useState<DashboardActiveFilter>(() =>
+    getDashboardActiveFilter(window.location.search, 'status'),
+  )
+  const [salesFilter, setSalesFilter] = useState<DashboardSalesFilter>(() =>
+    getDashboardSalesFilter(window.location.search),
+  )
+  const [appointmentsFilter, setAppointmentsFilter] = useState<AppointmentFilter>(() =>
+    getAppointmentFilter(window.location.search),
+  )
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [adminDarkMode, setAdminDarkMode] = useState(false)
+  const [adminPages, setAdminPages] = useState<Record<string, number>>({})
+  const [productSearch, setProductSearch] = useState('')
+  const [userSearch, setUserSearch] = useState('')
+  const getAdminPage = <T,>(key: string, items: T[]) => {
+    const pageCount = Math.max(1, Math.ceil(items.length / ADMIN_PAGE_SIZE))
+    const page = Math.min(adminPages[key] ?? 1, pageCount)
+    return {
+      page,
+      items: items.slice((page - 1) * ADMIN_PAGE_SIZE, page * ADMIN_PAGE_SIZE),
+    }
+  }
+  const setAdminPage = (key: string, page: number) =>
+    setAdminPages((previous) => ({ ...previous, [key]: page }))
+  const navigateToAdminSection = (nextSection: AdminSection, query?: string) => {
+    const paths: Partial<Record<AdminSection, string>> = {
+      pedidos: '/admin/pedidos',
+      reportes: '/admin/reportes',
+      clientes: '/admin/clientes',
+      inventario: '/admin/inventario',
+      taller: '/admin/taller',
+    }
+    const pathname = paths[nextSection] ?? '/'
+    const routeQuery = query ?? (
+      nextSection === 'pedidos' ? '?filter=todos'
+        : nextSection === 'reportes' ? `?view=${salesFilter}`
+          : nextSection === 'taller' ? `?status=${appointmentsFilter}`
+          : nextSection === 'clientes' || nextSection === 'inventario' ? '?status=all'
+            : ''
+    )
+    window.history.pushState({ adminSection: nextSection }, '', `${pathname}${routeQuery}`)
+    setSection(nextSection)
+    if (nextSection === 'pedidos') setFiltroEstado(getDashboardOrdersFilter(routeQuery))
+    if (nextSection === 'clientes') setClientsFilter(getDashboardActiveFilter(routeQuery, 'status'))
+    if (nextSection === 'inventario') setInventoryFilter(getDashboardActiveFilter(routeQuery, 'status'))
+    if (nextSection === 'reportes') setSalesFilter(getDashboardSalesFilter(routeQuery))
+    if (nextSection === 'taller') setAppointmentsFilter(getAppointmentFilter(routeQuery))
+    setAdminPage('orders', 1)
+    setAdminPage('clients', 1)
+    setAdminPage('inventory', 1)
+    setAdminPage('sales-report', 1)
+    setAdminPage('appointments', 1)
+    setAdminSectionKey((key) => key + 1)
+  }
+  const navigateToOrders = (filter: DashboardOrdersFilter) => {
+    navigateToAdminSection('pedidos', `?filter=${filter}`)
+  }
+  const updateOrdersFilter = (filter: DashboardOrdersFilter) => {
+    setFiltroEstado(filter)
+    setAdminPage('orders', 1)
+    const search = `?filter=${filter}`
+    window.history.replaceState({ adminSection: 'pedidos' }, '', `${window.location.pathname}${search}`)
+  }
+  const navigateToClients = (filter: DashboardActiveFilter) => {
+    navigateToAdminSection('clientes', `?status=${filter}`)
+  }
+  const navigateToInventory = (filter: DashboardActiveFilter) => {
+    navigateToAdminSection('inventario', `?status=${filter}`)
+  }
+  const navigateToSales = (filter: DashboardSalesFilter) => {
+    navigateToAdminSection('reportes', `?view=${filter}`)
+  }
+  const navigateToAppointments = (filter: AppointmentFilter) => {
+    navigateToAdminSection('taller', `?status=${filter}`)
+  }
+
+  useEffect(() => {
+    const syncAdminRoute = () => {
+      const currentSection = getAdminSectionFromPath(window.location.pathname)
+      setSection(currentSection)
+      if (currentSection === 'pedidos') setFiltroEstado(getDashboardOrdersFilter(window.location.search))
+      if (currentSection === 'clientes') setClientsFilter(getDashboardActiveFilter(window.location.search, 'status'))
+      if (currentSection === 'inventario') setInventoryFilter(getDashboardActiveFilter(window.location.search, 'status'))
+      if (currentSection === 'reportes') setSalesFilter(getDashboardSalesFilter(window.location.search))
+      if (currentSection === 'taller') setAppointmentsFilter(getAppointmentFilter(window.location.search))
+      setAdminPage('orders', 1)
+      setAdminPage('clients', 1)
+      setAdminPage('inventory', 1)
+      setAdminPage('sales-report', 1)
+      setAdminPage('appointments', 1)
+      setAdminSectionKey((key) => key + 1)
+    }
+    window.addEventListener('popstate', syncAdminRoute)
+    return () => window.removeEventListener('popstate', syncAdminRoute)
+  }, [])
 
   // Products state
   const [adminProducts, setAdminProducts] = useState<AdminProduct[]>(INIT_ADMIN_PRODUCTS)
   useEffect(() => {
-    void apiRequest<{ items: (Omit<AdminProduct, 'img'> & { img: string | null })[] }>('/admin/products', { token })
+    void apiRequest<{ items: (Omit<AdminProduct, 'img'> & { img: string | null })[] }>('/admin/products')
       .then(({ items }) => {
         const localById = new Map(INIT_ADMIN_PRODUCTS.map((product) => [product.id, product]))
         setAdminProducts(items.map((item) => ({
@@ -3022,7 +3562,7 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
         })))
       })
       .catch((error: unknown) => window.alert(error instanceof Error ? error.message : 'No fue posible cargar los productos de administración.'))
-  }, [token])
+  }, [])
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [savingProduct, setSavingProduct] = useState(false)
   const [editProduct, setEditProduct] = useState<AdminProduct | null>(null)
@@ -3033,10 +3573,10 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
   const [showAddUser, setShowAddUser] = useState(false)
   const [newUser, setNewUser] = useState({ name: '', email: '', password: '' })
   useEffect(() => {
-    void apiRequest<{ items: AdminUser[] }>('/admin/users', { token })
+    void apiRequest<{ items: AdminUser[] }>('/admin/users')
       .then(({ items }) => setUsers(items))
       .catch((error: unknown) => window.alert(error instanceof Error ? error.message : 'No fue posible cargar los usuarios.'))
-  }, [token])
+  }, [])
 
   // Clients state
   const [clients, setClients] = useState<AdminClient[]>(INIT_CLIENTS)
@@ -3044,7 +3584,7 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
   const [showAddClient, setShowAddClient] = useState(false)
   const [newClient, setNewClient] = useState({ name: '', email: '', phone: '', password: '', termsAccepted: false })
   useEffect(() => {
-    void apiRequest<{ items: AdminClient[] }>('/admin/clients', { token })
+    void apiRequest<{ items: AdminClient[] }>('/admin/clients')
       .then(({ items }) => setClients(items.map((client) => ({
         ...client,
         orders: Number(client.orders),
@@ -3052,21 +3592,31 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
         lastOrder: client.lastOrder ? new Date(client.lastOrder).toISOString().slice(0, 10) : null,
       }))))
       .catch((error: unknown) => window.alert(error instanceof Error ? error.message : 'No fue posible cargar los clientes.'))
-  }, [token])
+  }, [])
 
   // Offers state
   const [offers, setOffers] = useState<AdminOffer[]>([])
   const [showAddOffer, setShowAddOffer] = useState(false)
-  const [newOffer, setNewOffer] = useState({ title: '', discount: '', code: '', validUntil: '' })
+  const [editingOffer, setEditingOffer] = useState<AdminOffer | null>(null)
+  const [newOffer, setNewOffer] = useState({ title: '', discount: '', code: '', validFrom: '', validUntil: '', productIds: [] as number[] })
   useEffect(() => {
-    void apiRequest<{ items: AdminOffer[] }>('/admin/offers', { token })
-      .then(({ items }) => setOffers(items))
+    void apiRequest<{ items: AdminOffer[] }>('/admin/offers')
+      .then(({ items }) => setOffers(items.map((offer) => ({
+        ...offer,
+        productIds: Array.isArray(offer.productIds) ? offer.productIds.map(Number) : [],
+      }))))
       .catch((error: unknown) => window.alert(error instanceof Error ? error.message : 'No fue posible cargar las ofertas.'))
-  }, [token])
+  }, [])
 
   const [adminSectionKey, setAdminSectionKey] = useState(0)
   const [orders, setOrders] = useState<OrderRow[]>([])
   const [orderStatuses, setOrderStatuses] = useState<Record<string, string>>({})
+  const [appointments, setAppointments] = useState<ServiceAppointment[]>([])
+  useEffect(() => {
+    void apiRequest<{ items: ServiceAppointment[] }>('/admin/appointments')
+      .then(({ items }) => setAppointments(items))
+      .catch((error: unknown) => window.alert(error instanceof Error ? error.message : 'No fue posible cargar las citas del taller.'))
+  }, [])
   useEffect(() => {
     void apiRequest<{
       id: number
@@ -3078,7 +3628,7 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
       customerEmail: string
       invoiceNumber: string | null
       product: string
-    }[]>('/orders', { token })
+    }[]>('/orders')
       .then((savedOrders) => {
         const toUiStatus: Record<string, string> = {
           pending: 'pendiente', processing: 'en_proceso', shipped: 'enviado', delivered: 'entregado', cancelled: 'cancelado',
@@ -3099,7 +3649,7 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
         setOrderStatuses(Object.fromEntries(rows.map((order) => [order.id, order.status])))
       })
       .catch((error: unknown) => window.alert(error instanceof Error ? error.message : 'No fue posible cargar los pedidos.'))
-  }, [token])
+  }, [])
 
   // Quick sale (guest purchase)
   const [showQuickSale, setShowQuickSale] = useState(false)
@@ -3112,15 +3662,16 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
   const [adminReviews, setAdminReviews] = useState<AdminReview[]>([])
   useEffect(() => {
     void Promise.all([
-      apiRequest<AdminReview[]>('/admin/reviews?approved=false', { token }),
-      apiRequest<AdminReview[]>('/admin/reviews?approved=true', { token }),
+      apiRequest<AdminReview[]>('/admin/reviews?approved=false'),
+      apiRequest<AdminReview[]>('/admin/reviews?approved=true'),
     ])
       .then(([pending, approved]) => setAdminReviews([...approved, ...pending]))
       .catch((error: unknown) => window.alert(error instanceof Error ? error.message : 'No fue posible cargar las reseñas.'))
-  }, [token])
+  }, [])
 
   const navItems: { id: AdminSection; label: string; icon: React.ReactElement }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> },
+    { id: 'taller', label: 'Citas de taller', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5"><path d="M14.7 6.3a5 5 0 0 0-6.4 6.4L3 18l3 3 5.3-5.3a5 5 0 0 0 6.4-6.4L14 13l-3-3z"/></svg> },
     { id: 'pedidos', label: 'Pedidos', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg> },
     { id: 'productos', label: 'Productos', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5"><path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg> },
     { id: 'inventario', label: 'Inventario', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg> },
@@ -3147,7 +3698,7 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
   const saveProduct = async () => {
     const price = Number(newProduct.price)
     const stock = Number(newProduct.stock || 0)
-    if (!newProduct.name.trim() || !Number.isInteger(price) || price <= 0 || !Number.isInteger(stock) || stock < 0) {
+    if (newProduct.name.trim().length < 2 || newProduct.name.trim().length > 180 || !Number.isInteger(price) || price <= 0 || !Number.isInteger(stock) || stock < 0) {
       window.alert('Ingresa un nombre, un precio entero mayor que cero y un inventario válido.')
       return
     }
@@ -3161,14 +3712,13 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
     setSavingProduct(true)
     try {
       if (editProduct) {
-        await apiRequest(`/products/${editProduct.id}`, { method: 'PATCH', token, body: payload })
+        await apiRequest(`/products/${editProduct.id}`, { method: 'PATCH', body: payload })
         setAdminProducts((prev) => prev.map((product) => product.id === editProduct.id
           ? { ...product, ...payload, img: newProduct.imgPreview || product.img }
           : product))
       } else {
         const created = await apiRequest<{ id: number }>('/products', {
           method: 'POST',
-          token,
           body: { ...payload, description: '', gallery: [], specs: [], active: true, imageUrl: newProduct.imgPreview || null },
         })
         setAdminProducts((prev) => [...prev, {
@@ -3193,7 +3743,7 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
 
   const setProductActive = async (id: number, active: boolean) => {
     try {
-      await apiRequest(`/products/${id}`, { method: 'PATCH', token, body: { active } })
+      await apiRequest(`/products/${id}`, { method: 'PATCH', body: { active } })
       setAdminProducts((prev) => prev.map((product) => product.id === id ? { ...product, active } : product))
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'No fue posible actualizar el producto.')
@@ -3203,10 +3753,24 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
   const adjustStock = async (id: number, stock: number) => {
     if (stock < 0) return
     try {
-      await apiRequest(`/products/${id}`, { method: 'PATCH', token, body: { stock } })
+      await apiRequest(`/products/${id}`, { method: 'PATCH', body: { stock } })
       setAdminProducts((prev) => prev.map((product) => product.id === id ? { ...product, stock } : product))
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'No fue posible actualizar el inventario.')
+    }
+  }
+
+  const updateAppointmentStatus = async (appointment: ServiceAppointment, status: AppointmentStatus) => {
+    try {
+      await apiRequest(`/admin/appointments/${appointment.id}/status`, {
+        method: 'PATCH',
+        body: { status },
+      })
+      setAppointments((previous) => previous.map((item) =>
+        item.id === appointment.id ? { ...item, status } : item
+      ))
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'No fue posible actualizar el estado de la cita.')
     }
   }
 
@@ -3222,7 +3786,6 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
     try {
       await apiRequest(`/orders/${id}/status`, {
         method: 'PATCH',
-        token,
         body: { status: toApiStatus[status] ?? status },
       })
       const savedStatus = toUiStatus[toApiStatus[status] ?? status] ?? status
@@ -3245,7 +3808,6 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
     try {
       const user = await apiRequest<AdminUser>('/admin/users', {
         method: 'POST',
-        token,
         body: newUser,
       })
       setUsers((previous) => [user, ...previous])
@@ -3258,7 +3820,7 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
 
   const setAdminUserActive = async (user: AdminUser, active: boolean) => {
     try {
-      await apiRequest(`/admin/users/${user.id}/active`, { method: 'PATCH', token, body: { active } })
+      await apiRequest(`/admin/users/${user.id}/active`, { method: 'PATCH', body: { active } })
       setUsers((previous) => previous.map((item) => item.id === user.id ? { ...item, active } : item))
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'No fue posible actualizar el usuario.')
@@ -3267,7 +3829,7 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
 
   const setClientActive = async (client: AdminClient, active: boolean) => {
     try {
-      await apiRequest(`/admin/clients/${client.id}/active`, { method: 'PATCH', token, body: { active } })
+      await apiRequest(`/admin/clients/${client.id}/active`, { method: 'PATCH', body: { active } })
       setClients((previous) => previous.map((item) => item.id === client.id ? { ...item, active } : item))
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'No fue posible actualizar el cliente.')
@@ -3276,10 +3838,21 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
 
   const saveClient = async () => {
     if (!newClient.termsAccepted) return window.alert('Debes confirmar la aceptación de términos y privacidad.')
+    if (newClient.name.trim().length < 2 || newClient.name.trim().length > 120) {
+      return window.alert('El nombre debe contener entre 2 y 120 caracteres.')
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newClient.email)) {
+      return window.alert('Ingresa un correo electrónico válido.')
+    }
+    if (newClient.password.length < 10 || newClient.password.length > 72) {
+      return window.alert('La contraseña debe contener entre 10 y 72 caracteres.')
+    }
+    if (newClient.phone.length < 7 || newClient.phone.length > 15) {
+      return window.alert('El teléfono debe contener entre 7 y 15 dígitos.')
+    }
     try {
       const client = await apiRequest<AdminClient>('/admin/clients', {
         method: 'POST',
-        token,
         body: newClient,
       })
       setClients((previous) => [client, ...previous])
@@ -3291,15 +3864,22 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
   }
 
   const saveOffer = async () => {
+    const discount = Number(newOffer.discount)
+    if (!Number.isInteger(discount) || discount < 1 || discount > 100) {
+      window.alert('El descuento debe ser un número entero entre 1 y 100.')
+      return
+    }
     try {
-      const offer = await apiRequest<AdminOffer>('/admin/offers', {
-        method: 'POST',
-        token,
-        body: { ...newOffer, discount: Number(newOffer.discount) },
+      const offer = await apiRequest<AdminOffer>(editingOffer ? `/admin/offers/${editingOffer.id}` : '/admin/offers', {
+        method: editingOffer ? 'PATCH' : 'POST',
+        body: { ...newOffer, discount },
       })
-      setOffers((previous) => [offer, ...previous])
+      setOffers((previous) => editingOffer
+        ? previous.map((item) => item.id === editingOffer.id ? offer : item)
+        : [offer, ...previous])
       setShowAddOffer(false)
-      setNewOffer({ title: '', discount: '', code: '', validUntil: '' })
+      setEditingOffer(null)
+      setNewOffer({ title: '', discount: '', code: '', validFrom: '', validUntil: '', productIds: [] })
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'No fue posible guardar la oferta.')
     }
@@ -3307,16 +3887,39 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
 
   const setOfferActive = async (offer: AdminOffer, active: boolean) => {
     try {
-      await apiRequest(`/admin/offers/${offer.id}/active`, { method: 'PATCH', token, body: { active } })
+      await apiRequest(`/admin/offers/${offer.id}/active`, { method: 'PATCH', body: { active } })
       setOffers((previous) => previous.map((item) => item.id === offer.id ? { ...item, active } : item))
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'No fue posible actualizar la oferta.')
     }
   }
 
+  const archiveOffer = async (offer: AdminOffer) => {
+    if (!window.confirm(`¿Archivar la oferta "${offer.title}"? Se conservará su registro, pero dejará de aplicar.`)) return
+    try {
+      await apiRequest(`/admin/offers/${offer.id}`, { method: 'DELETE' })
+      setOffers((previous) => previous.map((item) => item.id === offer.id ? { ...item, active: false } : item))
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'No fue posible archivar la oferta.')
+    }
+  }
+
+  const editOffer = (offer: AdminOffer) => {
+    setEditingOffer(offer)
+    setNewOffer({
+      title: offer.title,
+      discount: String(offer.discount),
+      code: offer.code,
+      validFrom: offer.validFrom,
+      validUntil: offer.validUntil ?? '',
+      productIds: offer.productIds,
+    })
+    setShowAddOffer(true)
+  }
+
   const setReviewActive = async (review: AdminReview, active: boolean) => {
     try {
-      await apiRequest(`/admin/reviews/${review.id}/approval`, { method: 'PATCH', token, body: { approved: active } })
+      await apiRequest(`/admin/reviews/${review.id}/approval`, { method: 'PATCH', body: { approved: active } })
       setAdminReviews((previous) => previous.map((item) => item.id === review.id ? { ...item, approved: active } : item))
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'No fue posible actualizar la reseña.')
@@ -3324,16 +3927,21 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
   }
 
   const saveQuickSale = () => {
-    if (!quickSale.buyerName || !quickSale.productId) return
+    if (quickSale.buyerName.trim().length < 2 || !quickSale.productId) return
+    const quantity = Number(quickSale.qty)
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      window.alert('La cantidad debe ser un número entero mayor que cero.')
+      return
+    }
     const prod = adminProducts.find(p => String(p.id) === quickSale.productId)
     if (!prod) return
     const newId = `BS-${String(Date.now()).slice(-6)}`
     const newOrder = {
       id: newId,
-      client: quickSale.buyerName + ' (Visita)',
+      client: quickSale.buyerName.trim() + ' (Visita)',
       email: quickSale.phone || '—',
       product: prod.name,
-      total: prod.price * Math.max(1, Number(quickSale.qty)),
+      total: prod.price * quantity,
       status: 'pendiente',
       date: new Date().toISOString().split('T')[0],
       city: 'En tienda',
@@ -3343,8 +3951,7 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
     setOrderStatuses(prev => ({ ...prev, [newId]: 'pendiente' }))
     setShowQuickSale(false)
     setQuickSale({ productId: '', qty: '1', buyerName: '', phone: '' })
-    setSection('pedidos')
-    setAdminSectionKey(k => k + 1)
+    navigateToOrders('todos')
   }
 
   const exportClientXlsx = () => downloadXlsx([
@@ -3356,10 +3963,14 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
   const orderReportRows = orders.map((order) => [
     order.date, order.id, order.client, order.email, order.product, order.city, order.payMethod, order.total,
   ])
-  const salesOrders = orders.filter((order) => (orderStatuses[order.id] ?? order.status) !== 'cancelado')
+  const allSalesOrders = orders.filter((order) => (orderStatuses[order.id] ?? order.status) !== 'cancelado')
+  const salesOrders = allSalesOrders.filter((order) =>
+    salesFilter === 'all' || (orderStatuses[order.id] ?? order.status) === 'entregado'
+  )
   const salesReportRows = salesOrders.map((order) => [
     order.date, order.id, order.client, order.email, order.product, order.city, order.payMethod, order.total,
   ])
+  const allSalesRevenue = allSalesOrders.reduce((total, order) => total + order.total, 0)
   const salesRevenue = salesOrders.reduce((total, order) => total + order.total, 0)
   const reportPdf = (title: string, headers: string[], rows: (string | number)[][]) => {
     const reportWindow = window.open('', '_blank')
@@ -3372,8 +3983,10 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
     })[character]!)
     const head = headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')
     const body = rows.map((row) => `<tr>${row.map((value) => `<td>${escapeHtml(value)}</td>`).join('')}</tr>`).join('')
-    reportWindow.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>body{font:14px Arial,sans-serif;margin:32px;color:#000}h1{color:#000}p{color:#000}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;border:1px solid #bbb;color:#000}th{background:#f4f4f5;color:#000}@media print{body{margin:12mm}}</style></head><body><h1>${escapeHtml(title)}</h1><p>BS Bike Store · ${new Date().toLocaleDateString('es-CO')}</p><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table><script>window.onload=()=>window.print()</script></body></html>`)
+    reportWindow.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>body{font:14px Arial,sans-serif;margin:32px;color:#000}h1{color:#000}p{color:#000}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;border:1px solid #bbb;color:#000}th{background:#f4f4f5;color:#000}@media print{body{margin:12mm}}</style></head><body><h1>${escapeHtml(title)}</h1><p>BS Bike Store · ${new Date().toLocaleDateString('es-CO')}</p><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`)
     reportWindow.document.close()
+    reportWindow.focus()
+    reportWindow.setTimeout(() => reportWindow.print(), 250)
   }
   const exportClientPdf = () => reportPdf(
     'Informe de clientes',
@@ -3398,8 +4011,30 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
   ], 'informe-pedidos')
   const exportOrdersPdf = () => reportPdf('Informe de pedidos', orderReportHeaders, orderReportRows)
   const filteredClients = clients.filter((c) =>
-    c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
-    c.email.toLowerCase().includes(clientSearch.toLowerCase())
+    (clientsFilter === 'all' || c.active) &&
+    (c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+      c.email.toLowerCase().includes(clientSearch.toLowerCase()))
+  )
+  const filteredProducts = adminProducts.filter((product) =>
+    product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+    product.category.toLowerCase().includes(productSearch.toLowerCase())
+  )
+  const filteredInventoryProducts = filteredProducts.filter((product) =>
+    inventoryFilter === 'all' || (product.active && product.stock > 0)
+  )
+  const criticalStockProducts = adminProducts.filter((product) => product.stock <= 3)
+  const filteredUsers = users.filter((admin) =>
+    admin.name.toLowerCase().includes(userSearch.toLowerCase()) ||
+    admin.email.toLowerCase().includes(userSearch.toLowerCase())
+  )
+  const filteredOrders = orders.filter((order) => {
+    if (filtroEstado === 'todos') return true
+    const rawStatus = (orderStatuses[order.id] || order.status).trim().toLowerCase()
+    const status = ['en_proceso', 'processing', 'confirmed'].includes(rawStatus) ? 'confirmado' : rawStatus
+    return status === 'pendiente' || status === 'pending' || status === 'confirmado'
+  })
+  const filteredAppointments = appointments.filter((appointment) =>
+    appointmentsFilter === 'all' || appointment.status === appointmentsFilter
   )
 
   const inputCls = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D5C3A]/30 focus:border-[#0D5C3A] transition-all'
@@ -3407,17 +4042,16 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
   const btnOutline = 'border border-gray-200 hover:border-[#0D5C3A] text-gray-600 hover:text-[#0D5C3A] font-semibold px-4 py-2 rounded-xl text-sm transition-colors'
 
   return (
-    <div data-admin-theme={adminDarkMode ? 'dark' : 'light'} className="fixed inset-0 z-[100] flex bg-[#F4F4F5]">
+    <div data-admin-theme={darkMode ? 'dark' : 'light'} className="admin-panel fixed inset-0 z-[100] flex bg-[#F4F4F5]">
       <style>{`
-        [data-admin-theme="dark"]{color-scheme:dark;background:#111827;color:#e5e7eb}
-        [data-admin-theme="dark"] [class~="bg-white"],[data-admin-theme="dark"] [class~="bg-[#F4F4F5]"],[data-admin-theme="dark"] [class~="bg-gray-50"],[data-admin-theme="dark"] [class~="bg-gray-100"]{background-color:#1f2937!important}
-        [data-admin-theme="dark"] [class*="bg-[#F4F4F5]/"]{background-color:#273449!important}
-        [data-admin-theme="dark"] [class~="text-[#1A1A1A]"],[data-admin-theme="dark"] [class~="text-gray-700"]{color:#f3f4f6!important}
-        [data-admin-theme="dark"] [class~="text-gray-600"]{color:#d1d5db!important}
-        [data-admin-theme="dark"] [class~="text-gray-500"],[data-admin-theme="dark"] [class~="text-gray-400"]{color:#9ca3af!important}
-        [data-admin-theme="dark"] [class~="border-gray-100"],[data-admin-theme="dark"] [class~="border-gray-200"]{border-color:#374151!important}
-        [data-admin-theme="dark"] input,[data-admin-theme="dark"] select,[data-admin-theme="dark"] textarea{background-color:#111827;color:#f3f4f6;border-color:#4b5563}
-        [data-admin-theme="dark"] input::placeholder,[data-admin-theme="dark"] textarea::placeholder{color:#9ca3af}
+        [data-admin-theme="dark"]{color-scheme:dark;background:var(--page-bg);color:var(--text-primary)}
+        [data-admin-theme="dark"] [class~="bg-white"],[data-admin-theme="dark"] [class~="bg-[#F4F4F5]"],[data-admin-theme="dark"] [class~="bg-gray-50"],[data-admin-theme="dark"] [class~="bg-gray-100"]{background-color:var(--surface)!important}
+        [data-admin-theme="dark"] [class*="bg-[#F4F4F5]/"]{background-color:var(--surface-raised)!important}
+        [data-admin-theme="dark"] [class~="text-[#1A1A1A]"],[data-admin-theme="dark"] [class~="text-gray-700"]{color:var(--text-primary)!important}
+        [data-admin-theme="dark"] [class~="text-gray-600"],[data-admin-theme="dark"] [class~="text-gray-500"],[data-admin-theme="dark"] [class~="text-gray-400"]{color:var(--text-secondary)!important}
+        [data-admin-theme="dark"] [class~="border-gray-100"],[data-admin-theme="dark"] [class~="border-gray-200"]{border-color:var(--border-subtle)!important}
+        [data-admin-theme="dark"] input,[data-admin-theme="dark"] select,[data-admin-theme="dark"] textarea{background-color:var(--surface-raised);color:var(--text-primary);border-color:var(--border-subtle)}
+        [data-admin-theme="dark"] input::placeholder,[data-admin-theme="dark"] textarea::placeholder{color:var(--text-secondary)}
       `}</style>
       {/* Sidebar */}
       <aside className={`${sidebarOpen ? 'w-56' : 'w-16'} bg-[#1A1A1A] flex flex-col flex-shrink-0 transition-all duration-300 overflow-hidden`}>
@@ -3439,9 +4073,9 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
           {navItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => { setSection(item.id); setAdminSectionKey(k => k + 1) }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 hover:scale-[1.02] ${
-                section === item.id ? 'bg-[#0D5C3A] text-white' : 'text-gray-400 hover:bg-white/10 hover:text-white'
+              onClick={() => navigateToAdminSection(item.id)}
+              className={`admin-sidebar__nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 hover:scale-[1.02] ${
+                section === item.id ? 'is-active bg-[#0D5C3A] text-white' : 'text-gray-400 hover:bg-white/10 hover:text-white'
               }`}
             >
               {item.icon}
@@ -3453,7 +4087,7 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
         <div className="px-2 pb-4">
           <button
             onClick={onClose}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:bg-white/10 hover:text-white transition-all"
+            className="admin-sidebar__exit w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:bg-white/10 hover:text-white transition-all"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5 flex-shrink-0">
               <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -3473,13 +4107,13 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => setAdminDarkMode((enabled) => !enabled)}
-              aria-label={adminDarkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-              title={adminDarkMode ? 'Modo claro' : 'Modo oscuro'}
+              onClick={onToggleTheme}
+              aria-label={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+              title={darkMode ? 'Modo claro' : 'Modo oscuro'}
               className="flex items-center gap-2 border border-gray-200 px-3 py-2 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              <span aria-hidden="true">{adminDarkMode ? '☀️' : '🌙'}</span>
-              <span className="hidden sm:inline">{adminDarkMode ? 'Modo claro' : 'Modo oscuro'}</span>
+              <span aria-hidden="true">{darkMode ? '☀️' : '🌙'}</span>
+              <span className="hidden sm:inline">{darkMode ? 'Modo claro' : 'Modo oscuro'}</span>
             </button>
             <button
               onClick={() => setShowQuickSale(true)}
@@ -3517,15 +4151,15 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Cantidad</label>
-                    <input className={inputCls} type="number" min="1" value={quickSale.qty} onChange={e => setQuickSale(q => ({...q, qty: e.target.value}))} />
+                    <input className={inputCls} type="text" inputMode="numeric" pattern="[0-9]*" min="1" value={quickSale.qty} onKeyDown={handleDigitsOnlyKeyDown} onChange={e => setQuickSale(q => ({...q, qty: digitsOnly(e.target.value)}))} />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Nombre del comprador *</label>
-                    <input className={inputCls} placeholder="Nombre completo" value={quickSale.buyerName} onChange={e => setQuickSale(q => ({...q, buyerName: e.target.value}))} />
+                    <input className={inputCls} required minLength={2} maxLength={120} placeholder="Nombre completo" value={quickSale.buyerName} onChange={e => setQuickSale(q => ({...q, buyerName: e.target.value}))} />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Teléfono (opcional)</label>
-                    <input className={inputCls} placeholder="300 123 4567" value={quickSale.phone} onChange={e => setQuickSale(q => ({...q, phone: e.target.value}))} />
+                    <input className={inputCls} type="tel" inputMode="numeric" pattern="[0-9]{7,15}" maxLength={15} placeholder="3001234567" value={quickSale.phone} onKeyDown={handleDigitsOnlyKeyDown} onChange={e => setQuickSale(q => ({...q, phone: digitsOnly(e.target.value)}))} />
                   </div>
                   {quickSale.productId && (
                     <div className="bg-[#F4F4F5] rounded-xl px-4 py-3 flex justify-between items-center">
@@ -3537,7 +4171,7 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                   )}
                 </div>
                 <div className="flex gap-3 mt-6">
-                  <button onClick={saveQuickSale} disabled={!quickSale.buyerName || !quickSale.productId} className="flex-1 bg-[#0D5C3A] hover:bg-[#1A8A5A] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-2.5 rounded-xl text-sm transition-colors">
+                  <button onClick={saveQuickSale} disabled={quickSale.buyerName.trim().length < 2 || !quickSale.productId} className="flex-1 bg-[#0D5C3A] hover:bg-[#1A8A5A] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-2.5 rounded-xl text-sm transition-colors">
                     Registrar venta
                   </button>
                   <button onClick={() => setShowQuickSale(false)} className={btnOutline}>Cancelar</button>
@@ -3556,13 +4190,25 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
             <div>
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                 {[
-                  { label: 'Total Ventas', value: `$${(orders.reduce((s,o)=>s+o.total,0)/1000000).toFixed(1)}M`, sub: 'suma de pedidos', color: '#0D5C3A' },
-                  { label: 'Pedidos Totales', value: orders.length, sub: `${orders.filter(o=>(orderStatuses[o.id]||o.status)==='entregado').length} entregados`, color: '#1A8A5A' },
-                  { label: 'Pedidos Pendientes', value: orders.filter(o=>(orderStatuses[o.id]||o.status)==='pendiente'||(orderStatuses[o.id]||o.status)==='en_proceso').length, sub: 'por procesar', color: '#1A8A5A' },
-                  { label: 'Clientes Activos', value: clients.length, sub: 'registrados', color: '#1A8A5A' },
-                  { label: 'Productos Activos', value: adminProducts.filter(p=>p.active).length, sub: `de ${adminProducts.length} totales`, color: '#1A8A5A' },
+                  { label: 'Total Ventas', value: `$${(allSalesRevenue/1000000).toFixed(1)}M`, sub: 'ventas no canceladas', color: '#0D5C3A', action: () => navigateToAdminSection('reportes', '?view=all') },
+                  { label: 'Pedidos Totales', value: orders.length, sub: `${orders.filter(o=>(orderStatuses[o.id]||o.status)==='entregado').length} entregados`, color: '#1A8A5A', action: () => navigateToOrders('todos') },
+                  { label: 'Pedidos por atender', value: orders.filter(o=>(orderStatuses[o.id]||o.status)==='pendiente'||(orderStatuses[o.id]||o.status)==='en_proceso').length, sub: 'incluye pedidos confirmados', color: '#1A8A5A', action: () => navigateToOrders('por-atender') },
+                  { label: 'Clientes Activos', value: clients.filter((client) => client.active).length, sub: 'registrados', color: '#1A8A5A', action: () => navigateToClients('active') },
+                  { label: 'Productos Activos', value: adminProducts.filter((product) => product.active && product.stock > 0).length, sub: 'con stock disponible', color: '#1A8A5A', action: () => navigateToInventory('active') },
                 ].map((stat) => (
-                  <div key={stat.label} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:scale-105 transition-transform duration-200 cursor-default">
+                  <div
+                    key={stat.label}
+                    role="button"
+                    tabIndex={0}
+                    onClick={stat.action}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        stat.action()
+                      }
+                    }}
+                    className="admin-dashboard-card bg-white rounded-2xl p-5 shadow-sm border border-gray-100 transition-all duration-200 cursor-pointer hover:-translate-y-1 hover:border-[#0D5C3A]/30 hover:shadow-md focus-visible:outline-2 focus-visible:outline-[#0D5C3A]"
+                  >
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{stat.label}</p>
                     <p className="text-3xl font-black" style={{ color: stat.color, fontFamily: 'Montserrat, sans-serif' }}>{stat.value}</p>
                     <p className="text-xs text-gray-400 mt-1">{stat.sub}</p>
@@ -3574,9 +4220,11 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                 <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
                   <h3 className="font-black text-sm text-[#1A1A1A] mb-4 uppercase tracking-wide">Productos con stock crítico</h3>
                   <div className="space-y-3">
-                    {adminProducts.filter(p=>p.stock<=3).map((p) => (
+                    {getAdminPage('dashboard-stock', criticalStockProducts).items.map((p) => (
                       <div key={p.id} className="flex items-center gap-3">
-                        <img src={p.img} alt={p.name} className="w-10 h-10 rounded-lg object-contain p-1 img-product" />
+                        <div className="product-thumbnail">
+                          <img src={p.img} alt={p.name} className="product-thumbnail-image" />
+                        </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-[#1A1A1A] truncate">{p.name}</p>
                           <p className="text-xs text-gray-400">{p.category}</p>
@@ -3586,16 +4234,21 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                         </span>
                       </div>
                     ))}
-                    {adminProducts.filter(p=>p.stock<=3).length === 0 && (
+                    {criticalStockProducts.length === 0 && (
                       <p className="text-sm text-gray-400 text-center py-4">Todo el stock en buen nivel ✓</p>
                     )}
                   </div>
+                  <AdminPagination
+                    page={getAdminPage('dashboard-stock', criticalStockProducts).page}
+                    total={criticalStockProducts.length}
+                    onChange={(page) => setAdminPage('dashboard-stock', page)}
+                  />
                 </div>
 
                 <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
                   <h3 className="font-black text-sm text-[#1A1A1A] mb-4 uppercase tracking-wide">Últimos clientes</h3>
                   <div className="space-y-3">
-                    {clients.slice(0, 4).map((c) => (
+                    {getAdminPage('dashboard-clients', clients).items.map((c) => (
                       <div key={c.id} className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-[#0D5C3A]/10 flex items-center justify-center text-[#0D5C3A] font-black text-sm flex-shrink-0">
                           {c.name[0]}
@@ -3608,20 +4261,139 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                       </div>
                     ))}
                   </div>
+                  <AdminPagination
+                    page={getAdminPage('dashboard-clients', clients).page}
+                    total={clients.length}
+                    onChange={(page) => setAdminPage('dashboard-clients', page)}
+                  />
                 </div>
               </div>
+
+              <section className="admin-content-card mt-6 bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <div>
+                    <h3 className="font-black text-sm text-[#1A1A1A] uppercase tracking-wide">Agenda del taller</h3>
+                    <p className="text-xs text-gray-500">{appointments.filter((appointment) => appointment.status === 'pending').length} citas pendientes</p>
+                  </div>
+                  <button type="button" onClick={() => navigateToAppointments('all')} className={btnOutline + ' hover:-translate-y-0.5'}>
+                    Ver agendamientos
+                  </button>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {appointments
+                    .filter((appointment) => appointment.status === 'pending' || appointment.status === 'in_progress')
+                    .slice()
+                    .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))
+                    .slice(0, 4)
+                    .map((appointment) => (
+                      <div key={appointment.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3 text-sm">
+                        <span className="font-mono text-xs font-bold text-gray-500">#{appointment.id}</span>
+                        <span className="font-semibold text-[#1A1A1A]">{appointment.customerName}</span>
+                        <span className="text-gray-500">{appointment.serviceName}</span>
+                        <span className="ml-auto text-xs text-gray-500">{formatAppointmentDate(appointment.scheduledAt)}</span>
+                      </div>
+                    ))}
+                  {appointments.length === 0 && (
+                    <p className="py-4 text-sm text-gray-500">Todavía no hay citas agendadas.</p>
+                  )}
+                  {appointments.length > 0 && appointments.every((appointment) => appointment.status !== 'pending' && appointment.status !== 'in_progress') && (
+                    <p className="py-4 text-sm text-gray-500">No hay citas pendientes o en proceso.</p>
+                  )}
+                </div>
+              </section>
             </div>
+          )}
+
+          {section === 'taller' && (
+            <section className="admin-content-card bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-black text-[#1A1A1A]">Agendamientos de taller</h2>
+                  <p className="text-xs text-gray-500">{filteredAppointments.length} citas</p>
+                </div>
+                <label className="flex items-center gap-2 text-xs font-semibold text-gray-500">
+                  Estado
+                  <select
+                    aria-label="Filtrar citas por estado"
+                    className={inputCls + ' sm:w-56'}
+                    value={appointmentsFilter}
+                    onChange={(event) => navigateToAppointments(event.target.value as AppointmentFilter)}
+                  >
+                    <option value="all">Todos los estados</option>
+                    <option value="pending">Pendiente</option>
+                    <option value="in_progress">En proceso</option>
+                    <option value="completed">Completada</option>
+                    <option value="cancelled">Cancelada</option>
+                  </select>
+                </label>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="admin-appointments-table w-full text-sm">
+                  <thead className="bg-[#F4F4F5]">
+                    <tr>
+                      {['ID','Cliente','Teléfono','Servicio','Bicicleta','Fecha y hora','Estado','Observaciones'].map((heading) => (
+                        <th key={heading} className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">{heading}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {getAdminPage('appointments', filteredAppointments).items.map((appointment) => (
+                      <tr key={appointment.id} className="hover:bg-[#F4F4F5]/50 transition-colors">
+                        <td className="px-4 py-3 font-mono text-xs font-bold">#{appointment.id}</td>
+                        <td className="px-4 py-3 text-xs font-semibold">{appointment.customerName}</td>
+                        <td className="px-4 py-3 text-xs">{appointment.phone}</td>
+                        <td className="px-4 py-3 text-xs">
+                          <span className="block font-semibold">{appointment.serviceName}</span>
+                          {appointment.serviceType && <span className="text-gray-500">{appointment.serviceType}</span>}
+                        </td>
+                        <td className="px-4 py-3 text-xs">{appointment.bike}</td>
+                        <td className="px-4 py-3 text-xs whitespace-nowrap">{formatAppointmentDate(appointment.scheduledAt)}</td>
+                        <td className="px-4 py-3">
+                          <select
+                            aria-label={`Cambiar estado de la cita ${appointment.id}`}
+                            className={inputCls + ' min-w-36'}
+                            value={appointment.status}
+                            onChange={(event) => void updateAppointmentStatus(appointment, event.target.value as AppointmentStatus)}
+                          >
+                            <option value="pending">Pendiente</option>
+                            <option value="in_progress">En proceso</option>
+                            <option value="completed">Completada</option>
+                            <option value="cancelled">Cancelada</option>
+                          </select>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-600 max-w-xs">{appointment.observations || '—'}</td>
+                      </tr>
+                    ))}
+                    {filteredAppointments.length === 0 && (
+                      <tr><td colSpan={8} className="px-4 py-10 text-center text-sm text-gray-500">No hay citas para este filtro.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <AdminPagination
+                page={getAdminPage('appointments', filteredAppointments).page}
+                total={filteredAppointments.length}
+                onChange={(page) => setAdminPage('appointments', page)}
+              />
+            </section>
           )}
 
           {/* ── PRODUCTOS ── */}
           {section === 'productos' && (
             <div>
               <div className="flex items-center justify-between mb-5">
-                <p className="text-sm text-gray-500">{adminProducts.length} productos registrados</p>
+                <p className="text-sm text-gray-500">{filteredProducts.length} productos registrados</p>
                 <button onClick={() => { setEditProduct(null); setNewProduct({ name:'', category:'Todo Terreno', price:'', stock:'', imgPreview:'' }); setShowAddProduct(true) }} className={btnPrimary}>
                   + Agregar producto
                 </button>
               </div>
+              <input
+                className={`${inputCls} mb-4 max-w-sm`}
+                aria-label="Buscar productos"
+                placeholder="Buscar por producto o categoría..."
+                value={productSearch}
+                onChange={(event) => setProductSearch(event.target.value)}
+              />
 
               {showAddProduct && (
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
@@ -3629,7 +4401,7 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Nombre</label>
-                      <input className={inputCls} value={newProduct.name} onChange={(e) => setNewProduct((p) => ({ ...p, name: e.target.value }))} placeholder="Ej: Trek Top Fuel 9.9" />
+                      <input className={inputCls} required minLength={2} maxLength={180} value={newProduct.name} onChange={(e) => setNewProduct((p) => ({ ...p, name: e.target.value }))} placeholder="Ej: Trek Top Fuel 9.9" />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Categoría</label>
@@ -3639,11 +4411,11 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Precio (COP)</label>
-                      <input className={inputCls} type="number" value={newProduct.price} onChange={(e) => setNewProduct((p) => ({ ...p, price: e.target.value }))} placeholder="18900000" />
+                      <input className={inputCls} type="text" inputMode="numeric" pattern="[0-9]*" min="1" required value={newProduct.price} onKeyDown={handleDigitsOnlyKeyDown} onChange={(e) => setNewProduct((p) => ({ ...p, price: digitsOnly(e.target.value) }))} placeholder="18900000" />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Stock</label>
-                      <input className={inputCls} type="number" value={newProduct.stock} onChange={(e) => setNewProduct((p) => ({ ...p, stock: e.target.value }))} placeholder="10" />
+                      <input className={inputCls} type="text" inputMode="numeric" pattern="[0-9]*" min="0" required value={newProduct.stock} onKeyDown={handleDigitsOnlyKeyDown} onChange={(e) => setNewProduct((p) => ({ ...p, stock: digitsOnly(e.target.value) }))} placeholder="10" />
                     </div>
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Foto del producto</label>
@@ -3675,11 +4447,13 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {adminProducts.map((p) => (
+                    {getAdminPage('products', filteredProducts).items.map((p) => (
                       <tr key={p.id} className="hover:bg-[#F4F4F5]/50 transition-colors">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            <img src={p.img} alt={p.name} className="w-10 h-10 rounded-lg object-contain p-1 flex-shrink-0 img-product" />
+                            <div className="product-thumbnail">
+                              <img src={p.img} alt={p.name} className="product-thumbnail-image" />
+                            </div>
                             <span className="font-semibold text-[#1A1A1A] text-xs">{p.name}</span>
                           </div>
                         </td>
@@ -3711,6 +4485,11 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                     ))}
                   </tbody>
                 </table>
+                <AdminPagination
+                  page={getAdminPage('products', filteredProducts).page}
+                  total={filteredProducts.length}
+                  onChange={(page) => setAdminPage('products', page)}
+                />
               </div>
             </div>
           )}
@@ -3718,6 +4497,25 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
           {/* ── INVENTARIO ── */}
           {section === 'inventario' && (
             <div>
+              <input
+                className={`${inputCls} mb-4 max-w-sm`}
+                aria-label="Buscar productos del inventario"
+                placeholder="Buscar por producto o categoría..."
+                value={productSearch}
+                onChange={(event) => setProductSearch(event.target.value)}
+              />
+              <label className="flex items-center gap-2 text-xs font-semibold text-gray-500 mb-4">
+                Estado
+                <select
+                  aria-label="Filtrar productos del inventario"
+                  className={inputCls + ' max-w-xs'}
+                  value={inventoryFilter}
+                  onChange={(event) => navigateToInventory(event.target.value as DashboardActiveFilter)}
+                >
+                  <option value="all">Todos los productos</option>
+                  <option value="active">Activos con stock disponible</option>
+                </select>
+              </label>
               <div className="grid grid-cols-3 gap-4 mb-6">
                 {[
                   { label: 'Total unidades', value: adminProducts.reduce((s,p)=>s+p.stock,0), color: '#0D5C3A' },
@@ -3734,21 +4532,25 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                 <table className="w-full text-sm">
                   <thead className="bg-[#F4F4F5]">
                     <tr>
-                      {['Producto','Categoría','Stock actual','Nivel','Ajustar stock'].map(h=>(
+                      {['ID','Producto','Categoría','Precio','Stock actual','Nivel','Estado','Ajustar stock'].map(h=>(
                         <th key={h} className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {adminProducts.map((p) => (
+                    {getAdminPage('inventory', filteredInventoryProducts).items.map((p) => (
                       <tr key={p.id} className="hover:bg-[#F4F4F5]/50 transition-colors">
+                        <td className="px-4 py-3 font-mono text-xs text-gray-500">{p.id}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            <img src={p.img} alt={p.name} className="w-9 h-9 rounded-lg object-contain p-1 flex-shrink-0 img-product" />
+                            <div className="product-thumbnail">
+                              <img src={p.img} alt={p.name} className="product-thumbnail-image" />
+                            </div>
                             <span className="font-semibold text-xs text-[#1A1A1A]">{p.name}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-500">{p.category}</td>
+                        <td className="px-4 py-3 text-xs font-semibold text-[#1A1A1A]">${p.price.toLocaleString('es-CO')} COP</td>
                         <td className="px-4 py-3 font-black text-[#1A1A1A]">{p.stock}</td>
                         <td className="px-4 py-3">
                           <div className="w-24 bg-gray-100 rounded-full h-2">
@@ -3757,6 +4559,9 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                               backgroundColor: p.stock===0?'#dc2626':p.stock<=3?'#d97706':'#0D5C3A'
                             }} />
                           </div>
+                        </td>
+                        <td className="px-4 py-3 text-xs font-semibold">
+                          <span className={p.active ? 'text-green-700' : 'text-gray-500'}>{p.active ? 'Activo' : 'Inactivo'}</span>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
@@ -3769,6 +4574,11 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                     ))}
                   </tbody>
                 </table>
+                <AdminPagination
+                  page={getAdminPage('inventory', filteredInventoryProducts).page}
+                  total={filteredInventoryProducts.length}
+                  onChange={(page) => setAdminPage('inventory', page)}
+                />
               </div>
             </div>
           )}
@@ -3778,11 +4588,15 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
             <div>
               <div className="flex justify-between items-center mb-5">
                 <p className="text-sm text-gray-500">{offers.length} ofertas creadas</p>
-                <button onClick={() => setShowAddOffer(true)} className={btnPrimary}>+ Nueva oferta</button>
+                <button onClick={() => {
+                  setEditingOffer(null)
+                  setNewOffer({ title: '', discount: '', code: '', validFrom: new Date().toLocaleDateString('sv-SE'), validUntil: '', productIds: [] })
+                  setShowAddOffer(true)
+                }} className={btnPrimary}>+ Nueva oferta</button>
               </div>
               {showAddOffer && (
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
-                  <h3 className="font-black text-sm text-[#1A1A1A] mb-4 uppercase tracking-wide">Crear oferta</h3>
+                  <h3 className="font-black text-sm text-[#1A1A1A] mb-4 uppercase tracking-wide">{editingOffer ? 'Editar oferta' : 'Crear oferta'}</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Nombre de la oferta</label>
@@ -3790,30 +4604,55 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Descuento (%)</label>
-                      <input className={inputCls} type="number" min="1" max="100" value={newOffer.discount} onChange={e=>setNewOffer(o=>({...o,discount:e.target.value}))} placeholder="15" />
+                      <input className={inputCls} type="text" inputMode="numeric" pattern="[0-9]{1,3}" min="1" max="100" required value={newOffer.discount} onKeyDown={handleDigitsOnlyKeyDown} onChange={e=>setNewOffer(o=>({...o,discount:digitsOnly(e.target.value).slice(0, 3)}))} placeholder="15" />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Código</label>
                       <input className={inputCls} maxLength={40} value={newOffer.code} onChange={e=>setNewOffer(o=>({...o,code:e.target.value.toUpperCase()}))} placeholder="MTB15" />
                     </div>
                     <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Válido desde</label>
+                      <input className={inputCls} type="date" value={newOffer.validFrom} onChange={e=>setNewOffer(o=>({...o,validFrom:e.target.value}))} />
+                    </div>
+                    <div>
                       <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Válido hasta</label>
                       <input className={inputCls} type="date" value={newOffer.validUntil} onChange={e=>setNewOffer(o=>({...o,validUntil:e.target.value}))} />
                     </div>
                   </div>
+                  <fieldset className="mt-4">
+                    <legend className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">Productos incluidos</legend>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-48 overflow-y-auto rounded-xl border border-gray-200 p-3">
+                      {adminProducts.filter((product) => product.active).map((product) => (
+                        <label key={product.id} className="flex items-center gap-2 text-xs text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={newOffer.productIds.includes(product.id)}
+                            onChange={(event) => setNewOffer((offer) => ({
+                              ...offer,
+                              productIds: event.target.checked
+                                ? [...offer.productIds, product.id]
+                                : offer.productIds.filter((id) => id !== product.id),
+                            }))}
+                          />
+                          <span>{product.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
                   <div className="flex gap-3 mt-4">
-                    <button onClick={() => void saveOffer()} disabled={!newOffer.title.trim() || !newOffer.discount || Number(newOffer.discount) < 1 || Number(newOffer.discount) > 100 || !newOffer.code.trim()} className={btnPrimary + ' disabled:opacity-50'}>Crear oferta</button>
-                    <button onClick={() => setShowAddOffer(false)} className={btnOutline}>Cancelar</button>
+                    <button onClick={() => void saveOffer()} disabled={!newOffer.title.trim() || !newOffer.discount || Number(newOffer.discount) < 1 || Number(newOffer.discount) > 100 || !newOffer.code.trim() || !newOffer.validFrom || newOffer.productIds.length === 0} className={btnPrimary + ' disabled:opacity-50'}>{editingOffer ? 'Guardar cambios' : 'Crear oferta'}</button>
+                    <button onClick={() => { setShowAddOffer(false); setEditingOffer(null) }} className={btnOutline}>Cancelar</button>
                   </div>
                 </div>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {offers.map((o) => (
+                {getAdminPage('offers', offers).items.map((o) => (
                   <div key={o.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <p className="font-black text-[#1A1A1A] text-sm">{o.title}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">Hasta {o.validUntil || '—'}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{o.validFrom} → {o.validUntil || 'Sin vencimiento'}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{o.productIds.length} productos asociados</p>
                       </div>
                       <span className="text-2xl font-black text-[#0D5C3A]" style={{fontFamily:'Montserrat,sans-serif'}}>-{o.discount}%</span>
                     </div>
@@ -3831,11 +4670,19 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                         </div>
                         {o.active ? 'Activa' : 'Inactiva'}
                       </button>
-                      <span className="text-xs text-gray-400">{o.active ? 'Oferta visible' : 'Oferta pausada'}</span>
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => editOffer(o)} className="text-xs font-bold text-[#0D5C3A] hover:underline">Editar</button>
+                        <button onClick={() => void archiveOffer(o)} className="text-xs font-bold text-red-600 hover:underline">Archivar</button>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
+              <AdminPagination
+                page={getAdminPage('offers', offers).page}
+                total={offers.length}
+                onChange={(page) => setAdminPage('offers', page)}
+              />
             </div>
           )}
 
@@ -3843,9 +4690,16 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
           {section === 'usuarios' && (
             <div>
               <div className="flex justify-between items-center mb-5">
-                <p className="text-sm text-gray-500">{users.length} usuarios del sistema</p>
+                <p className="text-sm text-gray-500">{filteredUsers.length} usuarios del sistema</p>
                 <button onClick={() => setShowAddUser(true)} className={btnPrimary}>+ Crear administrador</button>
               </div>
+              <input
+                className={`${inputCls} mb-4 max-w-sm`}
+                aria-label="Buscar usuarios"
+                placeholder="Buscar por nombre o correo..."
+                value={userSearch}
+                onChange={(event) => setUserSearch(event.target.value)}
+              />
               {showAddUser && (
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
                   <h3 className="font-black text-sm text-[#1A1A1A] mb-4 uppercase tracking-wide">Nuevo usuario</h3>
@@ -3879,7 +4733,7 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {users.map((u) => (
+                    {getAdminPage('users', filteredUsers).items.map((u) => (
                       <tr key={u.id} className="hover:bg-[#F4F4F5]/50">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
@@ -3904,6 +4758,11 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                     ))}
                   </tbody>
                 </table>
+                <AdminPagination
+                  page={getAdminPage('users', filteredUsers).page}
+                  total={filteredUsers.length}
+                  onChange={(page) => setAdminPage('users', page)}
+                />
               </div>
             </div>
           )}
@@ -3916,6 +4775,15 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                   <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                   <input className={`${inputCls} pl-9`} placeholder="Buscar cliente..." value={clientSearch} onChange={e=>setClientSearch(e.target.value)} />
                 </div>
+                <select
+                  aria-label="Filtrar clientes"
+                  className={inputCls + ' max-w-xs'}
+                  value={clientsFilter}
+                  onChange={(event) => navigateToClients(event.target.value as DashboardActiveFilter)}
+                >
+                  <option value="all">Todos los clientes</option>
+                  <option value="active">Clientes activos</option>
+                </select>
                 <p className="text-sm text-gray-500">{filteredClients.length} clientes</p>
                 <button onClick={() => setShowAddClient((visible) => !visible)} className={btnPrimary}>+ Registrar cliente</button>
               </div>
@@ -3925,7 +4793,7 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <input className={inputCls} aria-label="Nombre del cliente" placeholder="Nombre completo" value={newClient.name} onChange={(event) => setNewClient((client) => ({ ...client, name: event.target.value }))} />
                     <input className={inputCls} aria-label="Correo del cliente" type="email" placeholder="Correo electrónico" value={newClient.email} onChange={(event) => setNewClient((client) => ({ ...client, email: event.target.value }))} />
-                    <input className={inputCls} aria-label="Teléfono del cliente" type="tel" placeholder="Teléfono" value={newClient.phone} onChange={(event) => setNewClient((client) => ({ ...client, phone: event.target.value }))} />
+                    <input className={inputCls} aria-label="Teléfono del cliente" type="tel" inputMode="numeric" pattern="[0-9]{7,15}" maxLength={15} placeholder="Teléfono" value={newClient.phone} onKeyDown={handleDigitsOnlyKeyDown} onChange={(event) => setNewClient((client) => ({ ...client, phone: digitsOnly(event.target.value) }))} />
                     <input className={inputCls} aria-label="Contraseña inicial" type="password" minLength={10} placeholder="Contraseña inicial (mín. 10 caracteres)" value={newClient.password} onChange={(event) => setNewClient((client) => ({ ...client, password: event.target.value }))} />
                   </div>
                   <label className="flex items-start gap-2 text-xs text-gray-600 my-4">
@@ -3942,14 +4810,15 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                 <table className="w-full text-sm">
                   <thead className="bg-[#F4F4F5]">
                     <tr>
-                      {['Cliente','Contacto','Pedidos','Total gastado','Último pedido','Estado'].map(h=>(
+                      {['ID','Cliente','Contacto','Pedidos','Total gastado','Último pedido','Estado'].map(h=>(
                         <th key={h} className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredClients.map((c) => (
+                    {getAdminPage('clients', filteredClients).items.map((c) => (
                       <tr key={c.id} className="hover:bg-[#F4F4F5]/50">
+                        <td className="px-4 py-3 font-mono text-xs text-gray-500">{c.id}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full bg-[#1A8A5A]/10 flex items-center justify-center text-[#0D5C3A] font-black text-sm">{c.name[0]}</div>
@@ -3974,6 +4843,11 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                     ))}
                   </tbody>
                 </table>
+                <AdminPagination
+                  page={getAdminPage('clients', filteredClients).page}
+                  total={filteredClients.length}
+                  onChange={(page) => setAdminPage('clients', page)}
+                />
               </div>
             </div>
           )}
@@ -3983,6 +4857,15 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
             <div className="space-y-6">
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Ventas:</span>
+                <select
+                  aria-label="Filtrar ventas del reporte"
+                  className={inputCls + ' max-w-xs'}
+                  value={salesFilter}
+                  onChange={(event) => navigateToSales(event.target.value as DashboardSalesFilter)}
+                >
+                  <option value="all">Todas las ventas</option>
+                  <option value="delivered">Ventas entregadas</option>
+                </select>
                 <button onClick={exportSalesPdf} className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg border border-gray-200 text-black hover:bg-gray-50 transition-colors">📄 PDF</button>
                 <button onClick={exportSalesXlsx} className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg border border-gray-200 text-black hover:bg-gray-50 transition-colors">📊 Excel (.xlsx)</button>
                 <span className="ml-2 text-xs font-bold text-gray-500 uppercase tracking-wider">Clientes:</span>
@@ -4035,6 +4918,41 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                 </div>
               </div>
 
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-[#F4F4F5]">
+                    <tr>
+                      {['Pedido','Fecha','Cliente','Productos','Estado','Total'].map((header) => (
+                        <th key={header} className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">{header}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {getAdminPage('sales-report', salesOrders).items.map((order) => (
+                      <tr key={order.id}>
+                        <td className="px-4 py-3 font-mono text-xs font-bold text-[#1A1A1A]">{order.id}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500">{order.date}</td>
+                        <td className="px-4 py-3 text-xs text-[#1A1A1A]">
+                          <span className="block font-semibold">{order.client}</span>
+                          <span className="text-gray-500">{order.email}</span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-600">{order.product}</td>
+                        <td className="px-4 py-3 text-xs font-semibold">{orderStatuses[order.id] ?? order.status}</td>
+                        <td className="px-4 py-3 text-xs font-black text-[#0D5C3A]">${order.total.toLocaleString('es-CO')} COP</td>
+                      </tr>
+                    ))}
+                    {salesOrders.length === 0 && (
+                      <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">No hay ventas para este filtro.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+                <AdminPagination
+                  page={getAdminPage('sales-report', salesOrders).page}
+                  total={salesOrders.length}
+                  onChange={(page) => setAdminPage('sales-report', page)}
+                />
+              </div>
+
               <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 overflow-hidden">
                 <h3 className="font-black text-sm text-[#1A1A1A] mb-4 uppercase tracking-wide">Top clientes por gasto</h3>
                 <div className="space-y-4">
@@ -4069,6 +4987,31 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
           {/* ── PEDIDOS ── */}
           {section === 'pedidos' && (
             <div>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="text-lg font-black text-[#1A1A1A]">Gestión de pedidos</h2>
+                  <p className="text-xs text-gray-500">
+                    {filtroEstado === 'por-atender'
+                      ? 'Pedidos pendientes y confirmados que aún están en proceso.'
+                      : 'Todos los pedidos registrados.'}
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 text-xs font-semibold text-gray-500">
+                  Mostrar
+                  <select
+                    aria-label="Filtrar pedidos"
+                    className={inputCls + ' admin-order-status-select transition-colors duration-200 sm:w-56'}
+                    value={filtroEstado}
+                    onChange={(event) => updateOrdersFilter(event.target.value as DashboardOrdersFilter)}
+                  >
+                    <option value="todos">Todos los pedidos</option>
+                    <option value="por-atender">Por atender</option>
+                  </select>
+                  <span className="whitespace-nowrap text-[11px] text-gray-500" aria-live="polite">
+                    {filteredOrders.length} {filteredOrders.length === 1 ? 'pedido' : 'pedidos'}
+                  </span>
+                </label>
+              </div>
               <div className="flex justify-end gap-2 mb-4">
                 <button onClick={exportOrdersPdf} className="px-3 py-2 rounded-lg border border-gray-200 text-black text-xs font-bold hover:bg-gray-50">📄 PDF pedidos</button>
                 <button onClick={exportOrdersXlsx} className="px-3 py-2 rounded-lg border border-gray-200 text-black text-xs font-bold hover:bg-gray-50">📊 Excel pedidos</button>
@@ -4118,7 +5061,7 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                         </div>
                         <div>
                           <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Estado</label>
-                          <select className={inputCls} value={orderStatuses[editOrderDraft.id] || editOrderDraft.status} onChange={e => setOrderStatuses(prev => ({...prev, [editOrderDraft.id]: e.target.value}))}>
+                          <select className={inputCls + ' admin-order-status-select transition-colors duration-200'} value={orderStatuses[editOrderDraft.id] || editOrderDraft.status} onChange={e => setOrderStatuses(prev => ({...prev, [editOrderDraft.id]: e.target.value}))}>
                             <option value="pendiente">Pendiente</option>
                             <option value="en_proceso">En proceso</option>
                             <option value="enviado">Enviado</option>
@@ -4165,14 +5108,17 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                   <table className="w-full text-sm">
                     <thead className="bg-[#F4F4F5]">
                       <tr>
-                        {['#Pedido','Factura','Cliente','Producto','Total','Fecha','Acciones'].map(h=>(
+                        {['#Pedido','Factura','Cliente','Producto','Estado','Total','Fecha','Acciones'].map(h=>(
                           <th key={h} className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {orders.map(o => {
+                      {getAdminPage('orders', filteredOrders).items.map(o => {
                         const st = orderStatuses[o.id] || o.status
+                        const normalizedStatus = st.trim().toLowerCase()
+                        const isPendingStatus = normalizedStatus === 'pendiente' || normalizedStatus === 'pending'
+                        const isProcessingStatus = ['en_proceso', 'processing', 'confirmado', 'confirmed'].includes(normalizedStatus)
                         return (
                           <tr key={o.id} className="hover:bg-[#F4F4F5]/50 transition-colors">
                             <td className="px-4 py-3 font-mono text-xs font-bold text-[#1A1A1A]">{o.id}</td>
@@ -4182,22 +5128,36 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                               <p className="text-[10px] text-gray-400">{o.email}</p>
                             </td>
                             <td className="px-4 py-3 text-xs text-gray-600 max-w-[140px] truncate">{o.product}</td>
+                            <td className="px-4 py-3">
+                              <span className={`admin-order-status admin-order-status--${
+                                isPendingStatus ? 'pending'
+                                  : isProcessingStatus ? 'processing'
+                                    : normalizedStatus === 'enviado' || normalizedStatus === 'shipped' ? 'shipped'
+                                      : normalizedStatus === 'entregado' || normalizedStatus === 'delivered' ? 'delivered'
+                                        : normalizedStatus === 'cancelado' || normalizedStatus === 'cancelled' ? 'cancelled'
+                                          : 'default'
+                              }`}>
+                                {isPendingStatus ? 'Pendiente' : isProcessingStatus ? 'Confirmado' : st.replace('_', ' ')}
+                              </span>
+                            </td>
                             <td className="px-4 py-3 font-black text-xs text-[#0D5C3A] whitespace-nowrap">${o.total.toLocaleString('es-CO')}</td>
                             <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{o.date}</td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => { setEditingOrder(o); setEditOrderDraft({...o}) }}
-                                  className="text-[#0D5C3A] hover:text-[#1A8A5A] transition-colors p-1 rounded"
+                                  className="admin-order-action admin-order-action--edit p-1 rounded transition-colors duration-200"
                                   title="Editar pedido"
+                                  aria-label={`Editar pedido ${o.id}`}
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                 </button>
                                 <button
                                   onClick={() => void updateOrderStatus(o.id, 'cancelado')}
-                                  disabled={st !== 'pendiente' && st !== 'en_proceso'}
-                                  className="text-red-500 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors p-1 rounded"
+                                  disabled={!isPendingStatus && !isProcessingStatus}
+                                  className="admin-order-action admin-order-action--cancel p-1 rounded transition-colors duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
                                   title="Cancelar pedido y devolver existencias"
+                                  aria-label={`Cancelar pedido ${o.id}`}
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
                                 </button>
@@ -4209,6 +5169,11 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                     </tbody>
                   </table>
                 </div>
+                <AdminPagination
+                  page={getAdminPage('orders', filteredOrders).page}
+                  total={filteredOrders.length}
+                  onChange={(page) => setAdminPage('orders', page)}
+                />
               </div>
             </div>
           )}
@@ -4228,7 +5193,7 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {adminReviews.map((review) => {
+                      {getAdminPage('reviews', adminReviews).items.map((review) => {
                         const active = review.approved
                         const reviewDate = new Date(review.createdAt).toLocaleDateString()
                         return (
@@ -4265,6 +5230,11 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
                     </tbody>
                   </table>
                 </div>
+                <AdminPagination
+                  page={getAdminPage('reviews', adminReviews).page}
+                  total={adminReviews.length}
+                  onChange={(page) => setAdminPage('reviews', page)}
+                />
               </div>
             </div>
           )}
@@ -4280,15 +5250,65 @@ function AdminPanel({ onClose, token }: { onClose: () => void; token: string }) 
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
+function getSavedThemePreference(): boolean {
+  try {
+    return window.localStorage.getItem('bs-bike-store-theme') === 'dark'
+  } catch (error) {
+    console.warn('No fue posible leer la preferencia de tema guardada.', error)
+    return false
+  }
+}
+
+const WISHLIST_STORAGE_KEY = 'bs-bike-store-wishlist'
+
+function getSavedWishlist(): number[] {
+  try {
+    const saved = window.localStorage.getItem(WISHLIST_STORAGE_KEY)
+    if (!saved) return []
+    const parsed: unknown = JSON.parse(saved)
+    if (!Array.isArray(parsed)) throw new Error('El formato guardado no es una lista.')
+    return [...new Set(parsed.filter((id): id is number => Number.isSafeInteger(id) && id > 0))]
+  } catch (error) {
+    console.warn('No fue posible leer la lista de deseos guardada.', error)
+    return []
+  }
+}
+
+function saveGuestWishlist(items: number[]): void {
+  try {
+    window.localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(items))
+  } catch (error) {
+    console.warn('No fue posible guardar la lista de deseos local.', error)
+  }
+}
+
+function clearGuestWishlist(): void {
+  try {
+    window.localStorage.removeItem(WISHLIST_STORAGE_KEY)
+  } catch (error) {
+    console.warn('No fue posible limpiar la lista de deseos local sincronizada.', error)
+  }
+}
+
+function normalizePriceFilter(value: string): string {
+  if (!value) return ''
+  const amount = Number(value)
+  if (!Number.isFinite(amount) || amount <= 0) return '0'
+  return String(Math.round(amount / 10_000) * 10_000)
+}
+
 export default function App() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [activeNavMenu, setActiveNavMenu] = useState<string | null>(null)
+  const [pageTransition, setPageTransition] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [cartOpen, setCartOpen] = useState(false)
   const [wishlistOpen, setWishlistOpen] = useState(false)
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [storeProducts, setStoreProducts] = useState<Product[]>(ALL_PRODUCTS)
-  const [wishlist, setWishlist] = useState<number[]>([])
+  const [wishlist, setWishlist] = useState<number[]>(getSavedWishlist)
+  const [wishlistProducts, setWishlistProducts] = useState<Product[]>([])
   const [activeCategory, setActiveCategory] = useState('Todas')
   const [priceSort, setPriceSort] = useState<'relevancia' | 'menor' | 'mayor'>('relevancia')
   const [priceMin, setPriceMin] = useState('')
@@ -4300,26 +5320,79 @@ export default function App() {
   const [adminOpen, setAdminOpen] = useState(false)
   const [adminLoginOpen, setAdminLoginOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
-  const [authToken, setAuthToken] = useState(() => window.sessionStorage.getItem(AUTH_TOKEN_KEY) ?? '')
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [ordersModalOpen, setOrdersModalOpen] = useState(false)
   const [checkoutAfterAuth, setCheckoutAfterAuth] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [legalModal, setLegalModal] = useState<'terminos' | 'privacidad' | 'cookies' | null>(null)
-  const [privacyConsentAccepted, setPrivacyConsentAccepted] = useState(() => {
-    try {
-      return window.localStorage.getItem(PRIVACY_CONSENT_KEY) === 'accepted'
-    } catch {
-      return false
-    }
-  })
-  const [darkMode, setDarkMode] = useState(false)
-  const [userReviews, setUserReviews] = useState<{ name: string; date: string; rating: number; bike: string; comment: string }[]>([])
+  const [darkMode, setDarkMode] = useState(getSavedThemePreference)
+  const [publicReviews, setPublicReviews] = useState<PublicReview[]>([])
   const searchRef = useRef<HTMLInputElement>(null)
+  const headerRef = useRef<HTMLElement>(null)
+  const transitionTimeoutRef = useRef<number | null>(null)
+  const wishlistRequestsRef = useRef(new Set<number>())
+
+  const refreshUserWishlist = async (user: AuthUser): Promise<void> => {
+    const guestItems = getSavedWishlist()
+    let guestSyncError: unknown = null
+    if (guestItems.length > 0) {
+      try {
+        await Promise.all(guestItems.map((productId) =>
+          apiRequest<{ productId: number; saved: boolean }>('/wishlist', {
+            method: 'POST',
+            body: { productId, action: 'add' },
+          })
+        ))
+      } catch (error) {
+        guestSyncError = error
+        console.error('No fue posible sincronizar todos los favoritos de invitado.', error)
+      }
+    }
+
+    const { items } = await apiRequest<{
+      items: (Omit<Partial<Product>, 'img'> & {
+        id: number
+        name: string
+        category: string
+        price: number
+        stock: number
+        img: string | null
+      })[]
+    }>(`/wishlist/${user.id}`)
+    const localById = new Map(ALL_PRODUCTS.map((product) => [product.id, product]))
+    const products = items.map((item): Product => {
+      const local = localById.get(item.id)
+      return {
+        ...local,
+        ...item,
+        price: Number(item.price),
+        priceLabel: `$${Number(item.price).toLocaleString('es-CO')}`,
+        img: item.img || local?.img || getBikeCategoryImage(item.category),
+        description: item.description || local?.description || '',
+        gallery: Array.isArray(item.gallery) ? item.gallery : local?.gallery ?? [],
+        specs: Array.isArray(item.specs) ? item.specs : local?.specs ?? [],
+        rating: Number(item.rating ?? local?.rating ?? 0),
+        reviews: Number(item.reviews ?? local?.reviews ?? 0),
+        badge: item.badge ?? local?.badge ?? null,
+        darkBg: local?.darkBg,
+      } as Product
+    })
+    setWishlistProducts(products)
+    setWishlist([...new Set(products.map((product) => product.id))])
+    if (guestItems.length > 0 && guestSyncError === null) clearGuestWishlist()
+    if (guestSyncError !== null) {
+      window.alert(guestSyncError instanceof Error ? guestSyncError.message : 'No fue posible sincronizar todos los favoritos guardados como invitado.')
+    }
+  }
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode)
+    try {
+      window.localStorage.setItem('bs-bike-store-theme', darkMode ? 'dark' : 'light')
+    } catch (error) {
+      console.warn('No fue posible guardar la preferencia de tema.', error)
+    }
   }, [darkMode])
 
   useEffect(() => {
@@ -4332,8 +5405,10 @@ export default function App() {
           return {
             ...local,
             ...item,
-            img: item.img || local?.img || '',
-            priceLabel: `$${item.price.toLocaleString('es-CO')}`,
+            price: Number(item.price),
+            img: item.img || local?.img || getBikeCategoryImage(item.category),
+            priceLabel: `$${Number(item.price).toLocaleString('es-CO')}`,
+            description: item.description || local?.description || '',
             gallery: item.gallery?.length ? item.gallery : local?.gallery ?? [],
             specs: item.specs?.length ? item.specs : local?.specs ?? [],
             rating: Number(item.rating ?? local?.rating ?? 0),
@@ -4347,14 +5422,54 @@ export default function App() {
   }, [adminOpen])
 
   useEffect(() => {
-    if (!authToken) return
-    void apiRequest<{ user: AuthUser }>('/auth/me', { token: authToken })
-      .then(({ user }) => setCurrentUser(user))
-      .catch(() => {
-        window.sessionStorage.removeItem(AUTH_TOKEN_KEY)
-        setAuthToken('')
+    void apiRequest<{ user: AuthUser }>('/auth/me')
+      .then(({ user }) => {
+        setCurrentUser(user)
+        void refreshUserWishlist(user).catch((error: unknown) => {
+          window.alert(error instanceof Error ? error.message : 'No fue posible cargar tu lista de deseos.')
+        })
+        if (user.role === 'admin' && getAdminSectionFromPath(window.location.pathname) !== 'dashboard') {
+          setAdminOpen(true)
+        }
+      })
+      .catch((error: unknown) => {
+        if (getAdminSectionFromPath(window.location.pathname) !== 'dashboard') {
+          setAdminLoginOpen(true)
+          return
+        }
+        if (error instanceof Error && !error.message.includes('iniciar sesión')) {
+          console.error('No fue posible restaurar la sesión de usuario.', error)
+        }
       })
   }, [])
+
+  useEffect(() => {
+    void apiRequest<PublicReview[]>('/reviews?limit=100')
+      .then(setPublicReviews)
+      .catch((error: unknown) => window.alert(error instanceof Error ? error.message : 'No fue posible cargar las reseñas.'))
+  }, [])
+
+  useEffect(() => () => {
+    if (transitionTimeoutRef.current !== null) window.clearTimeout(transitionTimeoutRef.current)
+  }, [])
+
+  useEffect(() => {
+    if (!activeNavMenu) return
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (event.target instanceof Node && !headerRef.current?.contains(event.target)) {
+        setActiveNavMenu(null)
+      }
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setActiveNavMenu(null)
+    }
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [activeNavMenu])
 
   const cartCount = cartItems.reduce((s, i) => s + i.qty, 0)
 
@@ -4370,8 +5485,13 @@ export default function App() {
             (p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
               p.category.toLowerCase().includes(searchQuery.toLowerCase()))
         )
-    if (priceMin !== '') list = list.filter(p => p.price >= Number(priceMin.replace(/\D/g, '')))
-    if (priceMax !== '') list = list.filter(p => p.price <= Number(priceMax.replace(/\D/g, '')))
+    const minPrice = Number(priceMin) || 0
+    const maxPrice = Number(priceMax) || Number.POSITIVE_INFINITY
+    list = list.filter((product) => {
+      const price = Number(product.price)
+      const matchPrecio = price >= minPrice && price <= maxPrice
+      return Number.isFinite(price) && matchPrecio
+    })
     if (priceSort === 'menor') list = [...list].sort((a, b) => a.price - b.price)
     else if (priceSort === 'mayor') list = [...list].sort((a, b) => b.price - a.price)
     return list
@@ -4388,31 +5508,38 @@ export default function App() {
     setTimeout(() => setAddedId(null), 1500)
   }
 
-  const handleAuthSuccess = (user: AuthUser, token: string) => {
+  const handleAuthSuccess = (user: AuthUser) => {
     setCurrentUser(user)
-    setAuthToken(token)
-    window.sessionStorage.setItem(AUTH_TOKEN_KEY, token)
     setAuthModalOpen(false)
+    void refreshUserWishlist(user).catch((error: unknown) => {
+      window.alert(error instanceof Error ? error.message : 'No fue posible cargar tu lista de deseos.')
+    })
     if (user.role === 'client' && checkoutAfterAuth) setCheckoutOpen(true)
     setCheckoutAfterAuth(false)
     if (user.role === 'admin') { setAdminLoginOpen(false); setAdminOpen(true) }
   }
 
-  const handleAdminLoginSuccess = (user: AuthUser, token: string) => {
+  const handleAdminLoginSuccess = (user: AuthUser) => {
     setCurrentUser(user)
-    setAuthToken(token)
-    window.sessionStorage.setItem(AUTH_TOKEN_KEY, token)
     setAdminLoginOpen(false)
     setAdminOpen(true)
+    void refreshUserWishlist(user).catch((error: unknown) => {
+      window.alert(error instanceof Error ? error.message : 'No fue posible cargar tu lista de deseos.')
+    })
   }
 
-  const handleLogout = () => {
-    setCurrentUser(null)
-    setAuthToken('')
-    window.sessionStorage.removeItem(AUTH_TOKEN_KEY)
-    setUserMenuOpen(false)
-    setAdminOpen(false)
-    setCartItems([])
+  const handleLogout = async () => {
+    try {
+      await apiRequest<void>('/auth/logout', { method: 'POST' })
+      setCurrentUser(null)
+      setWishlist(getSavedWishlist())
+      setWishlistProducts([])
+      setUserMenuOpen(false)
+      setAdminOpen(false)
+      setCartItems([])
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'No fue posible cerrar la sesión.')
+    }
   }
 
   const changeQty = (id: number, qty: number) => {
@@ -4425,8 +5552,75 @@ export default function App() {
 
   const removeItem = (id: number) => setCartItems((prev) => prev.filter((i) => i.id !== id))
 
-  const toggleWishlist = (id: number) =>
-    setWishlist((w) => (w.includes(id) ? w.filter((x) => x !== id) : [...w, id]))
+  const toggleWishlist = async (id: number) => {
+    if (!currentUser) {
+      setWishlist((previous) => {
+        const next = previous.includes(id) ? previous.filter((itemId) => itemId !== id) : [...previous, id]
+        saveGuestWishlist(next)
+        return next
+      })
+      return
+    }
+    if (wishlistRequestsRef.current.has(id)) return
+
+    wishlistRequestsRef.current.add(id)
+    try {
+      const { saved } = await apiRequest<{ productId: number; saved: boolean }>('/wishlist', {
+        method: 'POST',
+        body: { productId: id },
+      })
+      setWishlist((previous) => saved
+        ? (previous.includes(id) ? previous : [...previous, id])
+        : previous.filter((itemId) => itemId !== id))
+      const product = storeProducts.find((item) => item.id === id)
+      setWishlistProducts((previous) => saved
+        ? (previous.some((item) => item.id === id) || !product ? previous : [...previous, product])
+        : previous.filter((item) => item.id !== id))
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'No fue posible actualizar la lista de deseos.')
+    } finally {
+      wishlistRequestsRef.current.delete(id)
+    }
+  }
+
+  const removeWishlistItem = async (id: number) => {
+    if (!currentUser) {
+      setWishlist((previous) => {
+        const next = previous.filter((itemId) => itemId !== id)
+        saveGuestWishlist(next)
+        return next
+      })
+      return
+    }
+    if (wishlistRequestsRef.current.has(id)) return
+
+    wishlistRequestsRef.current.add(id)
+    try {
+      await apiRequest<void>(`/wishlist/${currentUser.id}/${id}`, { method: 'DELETE' })
+      setWishlist((previous) => previous.filter((itemId) => itemId !== id))
+      setWishlistProducts((previous) => previous.filter((item) => item.id !== id))
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'No fue posible quitar el producto de la lista de deseos.')
+    } finally {
+      wishlistRequestsRef.current.delete(id)
+    }
+  }
+
+  const runPrimaryTransition = (message: string, action: () => void) => {
+    if (transitionTimeoutRef.current !== null) window.clearTimeout(transitionTimeoutRef.current)
+    setPageTransition(message)
+    transitionTimeoutRef.current = window.setTimeout(() => {
+      action()
+      setPageTransition(null)
+      transitionTimeoutRef.current = null
+    }, 260)
+  }
+
+  const followNavMenuLink = (link: NavMenuLink) => {
+    if (link.category) setActiveCategory(link.category)
+    scrollTo(link.section)
+    setActiveNavMenu(null)
+  }
 
   const scrollTo = (sectionId: string) => {
     const el = document.getElementById(sectionId)
@@ -4439,28 +5633,14 @@ export default function App() {
     setTimeout(() => searchRef.current?.focus(), 100)
   }
 
-  const acceptPrivacyConsent = () => {
-    try {
-      window.localStorage.setItem(PRIVACY_CONSENT_KEY, 'accepted')
-    } catch {
-      // Allow access even when browser storage is unavailable.
-    }
-    setPrivacyConsentAccepted(true)
-  }
-
   return (
-    <div className={`min-h-screen bg-white dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200`}>
-      {!privacyConsentAccepted && (
-        <PrivacyConsentGate
-          onAccept={acceptPrivacyConsent}
-          onOpenTerms={() => setLegalModal('terminos')}
-          onOpenPrivacy={() => setLegalModal('privacidad')}
-        />
-      )}
-
+    <div className="app-shell min-h-screen dark:text-gray-100 transition-colors duration-200">
       {/* ─── NAV ─────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 bg-white border-b border-gray-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <header
+        ref={headerRef}
+        className="sticky top-0 z-30 bg-white border-b border-gray-100 shadow-sm"
+      >
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 lg:h-20">
             <button onClick={() => scrollTo('hero')} className="flex-shrink-0 flex items-center">
               <BSLogo size={52} />
@@ -4471,10 +5651,18 @@ export default function App() {
               {NAV_LINKS.map((link) => (
                 <button
                   key={link.label}
-                  onClick={() => scrollTo(link.section)}
-                  className="text-sm font-medium text-gray-700 hover:text-[#0D5C3A] transition-colors tracking-wide"
+                  type="button"
+                  aria-expanded={activeNavMenu === link.label}
+                  aria-controls={activeNavMenu === link.label ? 'store-mega-menu' : undefined}
+                  onClick={() => setActiveNavMenu((current) => current === link.label ? null : link.label)}
+                  className={`inline-flex items-center gap-1.5 text-sm font-medium transition-colors tracking-wide ${
+                    activeNavMenu === link.label ? 'text-[#0D5C3A]' : 'text-gray-700 hover:text-[#0D5C3A]'
+                  }`}
                 >
                   {link.label}
+                  <svg className={`h-3.5 w-3.5 transition-transform duration-200 ${activeNavMenu === link.label ? 'rotate-180' : ''}`} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="m3.5 6 4.5 4 4.5-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </button>
               ))}
             </nav>
@@ -4637,6 +5825,50 @@ export default function App() {
             </div>
           </div>
 
+          {activeNavMenu && NAV_MENU_CONTENT[activeNavMenu] && (
+            <div
+              id="store-mega-menu"
+              className="store-mega-menu absolute left-4 right-4 top-full z-40 lg:left-0 lg:right-0"
+            >
+              <div className="store-mega-menu__surface grid gap-8 rounded-b-2xl border border-t-0 p-6 shadow-2xl lg:grid-cols-[1fr_1fr_0.9fr] lg:p-8">
+                {NAV_MENU_CONTENT[activeNavMenu].columns.map((column, columnIndex) => (
+                  <div className="store-mega-menu__column" style={{ animationDelay: `${columnIndex * 55}ms` }} key={column.heading}>
+                    <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-gray-500">{column.heading}</p>
+                    <div className="grid gap-1">
+                      {column.links.map((item, itemIndex) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          style={{ animationDelay: `${columnIndex * 55 + itemIndex * 35}ms` }}
+                          onClick={() => followNavMenuLink(item)}
+                          className="store-mega-menu__link rounded-lg px-3 py-2.5 text-left text-sm font-medium text-gray-700 hover:text-[#0D5C3A] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0D5C3A]"
+                        >
+                          {item.label}
+                          <svg className="h-4 w-4 opacity-60" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                            <path d="M4 10h11m-4-4 4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <div className="store-mega-menu__featured">
+                  <p className="store-mega-menu__eyebrow mb-2 text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">{NAV_MENU_CONTENT[activeNavMenu].featured.eyebrow}</p>
+                  <h3 className="mb-2 text-xl font-black text-gray-900" style={{ fontFamily: 'Montserrat, sans-serif' }}>{NAV_MENU_CONTENT[activeNavMenu].featured.title}</h3>
+                  <p className="mb-5 text-sm leading-relaxed text-gray-600">{NAV_MENU_CONTENT[activeNavMenu].featured.description}</p>
+                  <button
+                    type="button"
+                    onClick={() => followNavMenuLink(NAV_MENU_CONTENT[activeNavMenu].featured.link)}
+                    className="inline-flex items-center gap-2 rounded-full bg-[#0D5C3A] px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#1A8A5A] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0D5C3A]"
+                  >
+                    {NAV_MENU_CONTENT[activeNavMenu].featured.link.label}
+                    <span aria-hidden="true">→</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Mobile search bar */}
           {searchOpen && (
             <div className="md:hidden pb-3 flex items-center gap-2 border-t border-gray-100 pt-3">
@@ -4689,28 +5921,32 @@ export default function App() {
       </header>
 
       {/* ─── HERO ─────────────────────────────────────────────────────────── */}
-      <section id="hero" className="relative overflow-hidden bg-[#1A1A1A] text-white">
+      <section id="hero" className="store-hero relative overflow-hidden bg-[#0b1713] text-white">
         <div
-          className="absolute inset-0 bg-cover bg-center opacity-50"
+          className="store-hero__image absolute inset-0 bg-cover bg-center"
           style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1506316940527-4d1c138978a0?auto=format&fit=crop&w=2000&q=85)' }}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#1A1A1A] via-[#1A1A1A]/75 to-[#1A1A1A]/20" />
+        <div className="store-hero__overlay absolute inset-0" />
+        <div className="store-hero__glow absolute -right-32 -top-32 h-96 w-96 rounded-full" aria-hidden="true" />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-40">
-          <div className="max-w-2xl">
-            <span className="inline-block text-[#1A8A5A] text-xs font-bold tracking-[0.2em] uppercase mb-4">
-              Temporada 2026 — Nueva Colección
+          <div className="store-hero__content max-w-2xl">
+            <span className="store-hero__eyebrow mb-5 inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-emerald-200">
+              Diseñadas para ir más lejos
             </span>
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black leading-none mb-6" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-              Encuentra tu <br /><span className="text-[#1A8A5A]">ruta perfecta.</span>
+              Encuentra tu <br /><span className="store-hero__accent">ruta perfecta.</span>
             </h1>
-            <p className="text-gray-300 text-lg lg:text-xl leading-relaxed mb-10 max-w-xl">
+            <p className="store-hero__description text-lg lg:text-xl leading-relaxed mb-10 max-w-xl">
               Explora nuestra colección de bicicletas de ruta, montaña y urbanas de alto rendimiento.
             </p>
             <div className="flex flex-wrap gap-4">
               <button
-                onClick={() => { setActiveCategory('Todas'); scrollTo('productos') }}
-                className="bg-[#0D5C3A] hover:bg-[#1A8A5A] text-white font-bold px-10 py-4 rounded-full transition-all duration-200 text-sm tracking-widest uppercase"
+                onClick={() => runPrimaryTransition('Preparando el catálogo…', () => {
+                  setActiveCategory('Todas')
+                  scrollTo('productos')
+                })}
+                className="store-hero__cta bg-[#0D5C3A] hover:bg-[#1A8A5A] text-white font-bold px-10 py-4 rounded-full text-sm tracking-widest uppercase"
               >
                 Ver Bicicletas
               </button>
@@ -4719,7 +5955,7 @@ export default function App() {
         </div>
 
         {/* Stats strip */}
-        <div className="relative border-t border-white/10">
+        <div className="store-hero__stats relative border-t border-white/10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-2 lg:grid-cols-4 gap-6">
             {[
               { label: 'Modelos disponibles', value: '200+' },
@@ -4727,9 +5963,9 @@ export default function App() {
               { label: 'Años de experiencia', value: '15' },
               { label: 'Servicios al año', value: '5.000+' },
             ].map((s) => (
-              <div key={s.label} className="text-center">
-                <div className="text-2xl lg:text-3xl font-black text-[#1A8A5A]" style={{ fontFamily: 'Montserrat, sans-serif' }}>{s.value}</div>
-                <div className="text-xs text-gray-400 mt-1 tracking-wide">{s.label}</div>
+              <div key={s.label} className="store-hero__stat text-center">
+                <div className="store-hero__stat-value text-2xl lg:text-3xl font-black" style={{ fontFamily: 'Montserrat, sans-serif' }}>{s.value}</div>
+                <div className="store-hero__stat-label text-xs mt-1 tracking-wide">{s.label}</div>
               </div>
             ))}
           </div>
@@ -4737,8 +5973,8 @@ export default function App() {
       </section>
 
       {/* ─── FEATURED PRODUCTS ────────────────────────────────────────────── */}
-      <section id="productos" className="py-20 lg:py-28 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section id="productos" className="catalog-section py-20 lg:py-28">
+        <div className="catalog-section__content max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between mb-8">
             <div>
               <span className="text-[#0D5C3A] text-xs font-bold tracking-[0.2em] uppercase block mb-2">Selección Editorial</span>
@@ -4787,20 +6023,30 @@ export default function App() {
             <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Rango de precio:</span>
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500">De</span>
+              <span className="price-range-input__currency" aria-hidden="true">$</span>
               <input
                 type="number"
-                placeholder="Mín"
+                min="0"
+                step="10000"
+                placeholder="380.000"
+                aria-label="Precio mínimo en pesos colombianos"
                 value={priceMin}
                 onChange={e => setPriceMin(e.target.value)}
-                className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm w-28 focus:outline-none focus:border-[#0D5C3A] transition-colors"
+                onBlur={e => setPriceMin(normalizePriceFilter(e.target.value))}
+                className="price-range-input rounded-xl px-3 py-1.5 text-sm w-28 transition-colors duration-200"
               />
               <span className="text-xs text-gray-500">a</span>
+              <span className="price-range-input__currency" aria-hidden="true">$</span>
               <input
                 type="number"
-                placeholder="Máx"
+                min="0"
+                step="10000"
+                placeholder="36.000.000"
+                aria-label="Precio máximo en pesos colombianos"
                 value={priceMax}
                 onChange={e => setPriceMax(e.target.value)}
-                className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm w-28 focus:outline-none focus:border-[#0D5C3A] transition-colors"
+                onBlur={e => setPriceMax(normalizePriceFilter(e.target.value))}
+                className="price-range-input rounded-xl px-3 py-1.5 text-sm w-28 transition-colors duration-200"
               />
               <span className="text-xs text-gray-400">COP</span>
             </div>
@@ -4828,20 +6074,18 @@ export default function App() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredProducts.map((p) => (
-                <div key={p.id} className="bg-white rounded-2xl overflow-hidden group hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 ease-out flex flex-col shadow-sm">
+                <div key={p.id} className="catalog-card group hover:-translate-y-1">
                   <div
-                    className={`relative overflow-hidden cursor-zoom-in rounded-t-2xl ${
-                      WHITE_GRID_IMAGE_PRODUCT_IDS.has(p.id)
-                        ? 'grid place-items-center bg-(--color-white)'
-                        : 'flex items-center justify-center card-img-bg'
-                    }`}
-                    style={{ minHeight: '184px' }}
+                    className="catalog-card__media relative cursor-zoom-in"
                     onClick={() => setSelectedProduct(p)}
                   >
                     <img
                       src={p.img}
                       alt={p.name}
-                      className="absolute inset-0 w-full h-full object-contain object-center p-3 transition-all duration-500 group-hover:scale-105 img-product"
+                      className="catalog-card__image absolute inset-0 transition-transform duration-500 group-hover:scale-105"
+                      loading="lazy"
+                      decoding="async"
+                      onError={(event) => handleImageFallback(event, getBikeImageFallback(p.category))}
                     />
                     <div className="absolute inset-0 bg-transparent transition-colors duration-200 flex items-center justify-center">
                       <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 flex items-center gap-1.5 text-xs font-bold text-[#0D5C3A]">
@@ -4877,15 +6121,20 @@ export default function App() {
                     </button>
                   </div>
 
-                  <div className="px-4 pb-4 pt-2 flex flex-col flex-1">
-                    <span className="text-[#0D5C3A] text-[10px] font-bold uppercase tracking-widest mb-0.5">{p.category}</span>
-                    <h3 className="font-black text-[#1A1A1A] text-sm leading-tight mb-1.5" style={{ fontFamily: 'Montserrat, sans-serif' }}>{p.name}</h3>
+                  <div className="catalog-card__content">
+                    <span className="catalog-card__eyebrow">{p.category}</span>
+                    <h3 className="catalog-card__title">{p.name}</h3>
+                    <p className="catalog-card__description line-clamp-2">{p.description}</p>
                     <div className="flex items-center gap-1.5 mb-2">
                       <StarRating rating={p.rating} />
                       <span className="text-[10px] text-gray-500">({p.reviews})</span>
                     </div>
                     <div className="mt-auto flex items-center justify-between gap-2">
-                      <span className="text-base font-black text-[#1A1A1A]">{p.priceLabel}</span>
+                      <span className="flex flex-col">
+                        {p.offerDiscount && p.originalPrice && <span className="text-xs text-gray-400 line-through">${p.originalPrice.toLocaleString('es-CO')}</span>}
+                        <span className="text-base font-black text-[#1A1A1A]">{p.priceLabel}</span>
+                        {p.offerDiscount && <span className="text-[10px] font-bold text-emerald-700">Oferta -{p.offerDiscount}%</span>}
+                      </span>
                       <button
                         onClick={() => p.stock > 0 && addToCart(p)}
                         disabled={p.stock === 0}
@@ -4926,24 +6175,27 @@ export default function App() {
               <button
                 key={part.title}
                 onClick={() => setSelectedPartCategory(part)}
-                className="group bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-2 hover:border-[#0D5C3A]/30 active:scale-[0.98] transition-all duration-300 text-left cursor-pointer focus-visible:outline-2 focus-visible:outline-[#0D5C3A] focus-visible:outline-offset-2"
+                className="catalog-card parts-category-card group text-left cursor-pointer focus-visible:outline-2 focus-visible:outline-[#0D5C3A] focus-visible:outline-offset-2"
               >
-                <div className="h-44 overflow-hidden bg-[#F4F4F5]">
+                <div className="parts-card__media">
                   <img
                     src={part.img}
                     alt={part.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 img-hero"
+                    className="catalog-card__image parts-card__image group-hover:scale-105"
+                    loading="lazy"
+                    decoding="async"
+                    onError={(event) => handleImageFallback(event, getPartImageFallback(part.title))}
                   />
                 </div>
-                <div className="p-6">
-                  <span className="inline-block text-[#0D5C3A] text-[10px] font-bold tracking-widest uppercase mb-2">
+                <div className="catalog-card__content">
+              <span className="catalog-card__eyebrow">
                     Disponible en tienda
                   </span>
-                  <h3 className="text-xl font-black text-[#1A1A1A] mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+              <h3 className="catalog-card__title">
                     {part.title}
                   </h3>
-                  <p className="text-sm text-gray-500 leading-relaxed">{part.desc}</p>
-                  <span className="mt-4 inline-flex items-center gap-1.5 text-[#0D5C3A] text-xs font-black group-hover:gap-3 transition-all">
+              <p className="catalog-card__description">{part.desc}</p>
+              <span className="catalog-card__link">
                     Ver repuestos y precios
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                       <path d="M5 12h14M12 5l7 7-7 7" />
@@ -4962,7 +6214,7 @@ export default function App() {
               <p className="text-green-100 text-sm mt-1">Nuestro equipo revisa la compatibilidad antes de tu compra.</p>
             </div>
             <button
-              onClick={() => scrollTo('servicios')}
+              onClick={() => runPrimaryTransition('Conectando con un asesor…', () => window.dispatchEvent(new Event(OPEN_CHAT_EVENT)))}
               className="bg-white text-[#0D5C3A] font-black px-6 py-3 rounded-full hover:bg-gray-100 transition-colors text-sm whitespace-nowrap"
             >
               Solicitar asesoría
@@ -4972,10 +6224,10 @@ export default function App() {
       </section>
 
       {/* ─── SERVICES ────────────────────────────────────────────────────── */}
-      <section id="servicios" className="py-20 lg:py-28 bg-[#1A1A1A] text-white">
+      <section id="servicios" className="service-section py-20 lg:py-28 bg-[#1A1A1A] text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-14">
-            <span className="text-[#1A8A5A] text-xs font-bold tracking-[0.2em] uppercase block mb-3">Nuestro Taller</span>
+            <span className="service-section__accent text-[#1A8A5A] text-xs font-bold tracking-[0.2em] uppercase block mb-3">Nuestro Taller</span>
             <h2 className="text-4xl lg:text-5xl font-black" style={{ fontFamily: 'Montserrat, sans-serif' }}>
               Servicios de Taller<br className="hidden lg:block" /> y Mantenimiento
             </h2>
@@ -4985,15 +6237,15 @@ export default function App() {
             {SERVICES.map((s) => (
               <button
                 key={s.title}
-                onClick={() => setSelectedService(s)}
+                onClick={() => runPrimaryTransition('Abriendo agenda de servicio…', () => setSelectedService(s))}
                 className="bg-white/5 border border-white/10 rounded-2xl p-7 hover:border-[#0D5C3A] hover:bg-[#0D5C3A]/10 transition-all duration-300 group text-left"
               >
-                <div className="text-[#1A8A5A] mb-5 group-hover:text-white transition-colors">{s.icon}</div>
-                <h3 className="font-black text-lg mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>{s.title}</h3>
-                <p className="text-gray-400 text-sm leading-relaxed mb-4">{s.desc}</p>
-                <span className="text-[#1A8A5A] font-black text-lg">{s.price}</span>
+                <div className="service-section__accent mb-5 group-hover:text-white transition-colors">{s.icon}</div>
+                <h3 className="service-section__title font-black text-lg mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>{s.title}</h3>
+                <p className="service-section__description text-gray-400 text-sm leading-relaxed mb-4">{s.desc}</p>
+                <span className="service-section__accent font-black text-lg">{s.price}</span>
                 {s.title !== 'Envío Express' && (
-                  <div className="mt-4 flex items-center gap-1.5 text-[#1A8A5A] text-xs font-semibold">
+                  <div className="service-section__accent mt-4 flex items-center gap-1.5 text-xs font-semibold">
                     Agendar cita
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                       <path d="M5 12h14M12 5l7 7-7 7" />
@@ -5010,7 +6262,7 @@ export default function App() {
               <p className="text-green-200 text-sm">Agenda tu cita en minutos. Atención de lunes a sábado.</p>
             </div>
             <button
-              onClick={() => setSelectedService(SERVICES[0])}
+              onClick={() => runPrimaryTransition('Preparando tu agenda…', () => setSelectedService(SERVICES[0]))}
               className="bg-white text-[#0D5C3A] font-black px-8 py-3.5 rounded-full hover:bg-gray-100 transition-colors text-sm tracking-wide uppercase whitespace-nowrap"
             >
               Agendar Servicio
@@ -5028,8 +6280,8 @@ export default function App() {
             <p className="text-gray-500 mt-3 text-sm">Lo que dicen nuestros ciclistas sobre sus bicicletas</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {[...REVIEWS, ...userReviews].map((r, i) => (
-              <div key={i} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col gap-3">
+            {publicReviews.map((r) => (
+              <div key={r.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col gap-3">
                 <div className="flex items-center gap-0.5">
                   {[1,2,3,4,5].map(s => (
                     <svg key={s} className={`w-4 h-4 ${s <= r.rating ? 'fill-[#0D5C3A] text-[#0D5C3A]' : 'fill-gray-200 text-gray-200'}`} viewBox="0 0 20 20">
@@ -5040,22 +6292,32 @@ export default function App() {
                 <p className="text-gray-700 text-sm leading-relaxed italic">"{r.comment}"</p>
                 <div className="mt-auto flex items-center justify-between">
                   <div>
-                    <p className="font-black text-[#1A1A1A] text-sm" style={{ fontFamily: 'Montserrat, sans-serif' }}>{r.name}</p>
-                    <p className="text-xs text-gray-400">{r.date}</p>
+                    <p className="font-black text-[#1A1A1A] text-sm" style={{ fontFamily: 'Montserrat, sans-serif' }}>{r.author}</p>
+                    <p className="text-xs text-gray-400">{new Date(r.createdAt).toLocaleDateString('es-CO')}</p>
                   </div>
-                  <span className="text-[10px] font-bold text-[#0D5C3A] bg-[#0D5C3A]/10 px-3 py-1 rounded-full">{r.bike}</span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-[10px] font-bold text-[#0D5C3A] bg-[#0D5C3A]/10 px-3 py-1 rounded-full">{r.productName}</span>
+                    {r.verifiedPurchase && <span className="text-[10px] font-bold text-emerald-700">Compra verificada</span>}
+                  </div>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Review Form */}
-          <ReviewForm onSubmit={r => setUserReviews(prev => [...prev, r])} />
+          {!publicReviews.length && <p className="text-center text-gray-500 text-sm mt-8">Aún no hay reseñas aprobadas.</p>}
+          <ReviewForm
+            products={storeProducts}
+            user={currentUser}
+            onRequestLogin={() => setAuthModalOpen(true)}
+            onSubmit={async (review) => {
+              await apiRequest('/reviews', { method: 'POST', body: review })
+            }}
+          />
         </div>
       </section>
 
       {/* ─── FOOTER ─────────────────────────────────────────────────────── */}
-      <footer className="bg-[#1A1A1A] text-gray-400 pt-16 pb-8">
+      <footer className="site-footer bg-[#1A1A1A] text-gray-400 pt-16 pb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-10 mb-14">
             <div className="col-span-2 md:col-span-1">
@@ -5076,7 +6338,7 @@ export default function App() {
                     <li key={l}>
                       <button
                         onClick={() => scrollTo(col.title === 'Explorar' || col.title === 'Servicios' ? 'productos' : 'resenas')}
-                        className="text-sm hover:text-[#1A8A5A] transition-colors text-left"
+                        className="site-footer__link text-sm hover:text-[#1A8A5A] transition-colors text-left"
                       >
                         {l}
                       </button>
@@ -5087,15 +6349,15 @@ export default function App() {
             ))}
           </div>
 
-          <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-gray-600">
+          <div className="site-footer__legal border-t border-white/10 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-gray-600">
             <p>© 2026 BS Bike Store. Todos los derechos reservados.</p>
             <div className="flex gap-6 items-center">
-              <button onClick={() => setLegalModal('terminos')} className="hover:text-[#1A8A5A] transition-colors">Términos y Condiciones</button>
-              <button onClick={() => setLegalModal('privacidad')} className="hover:text-[#1A8A5A] transition-colors">Política de Privacidad</button>
-              <button onClick={() => setLegalModal('cookies')} className="hover:text-[#1A8A5A] transition-colors">Cookies</button>
+              <button onClick={() => setLegalModal('terminos')} className="site-footer__link hover:text-[#1A8A5A] transition-colors">Términos y Condiciones</button>
+              <button onClick={() => setLegalModal('privacidad')} className="site-footer__link hover:text-[#1A8A5A] transition-colors">Política de Privacidad</button>
+              <button onClick={() => setLegalModal('cookies')} className="site-footer__link hover:text-[#1A8A5A] transition-colors">Cookies</button>
               <button
                 onClick={() => setAdminLoginOpen(true)}
-                className="flex items-center gap-1.5 text-gray-600 hover:text-[#1A8A5A] transition-colors border border-white/10 hover:border-[#1A8A5A]/40 rounded-lg px-3 py-1.5"
+                className="site-footer__link flex items-center gap-1.5 hover:text-[#1A8A5A] transition-colors border border-white/10 hover:border-[#1A8A5A]/40 rounded-lg px-3 py-1.5"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5">
                   <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
@@ -5113,7 +6375,8 @@ export default function App() {
         open={wishlistOpen}
         onClose={() => setWishlistOpen(false)}
         wishlist={wishlist}
-        onToggleWishlist={toggleWishlist}
+        products={currentUser ? wishlistProducts : storeProducts}
+        onRemoveWishlist={removeWishlistItem}
         onAddToCart={(p) => { addToCart(p); setWishlistOpen(false); }}
       />
       <CartDrawer
@@ -5155,7 +6418,7 @@ export default function App() {
           onOpenLegal={setLegalModal}
         />
       )}
-      {ordersModalOpen && authToken && <MyOrdersModal token={authToken} onClose={() => setOrdersModalOpen(false)} />}
+      {ordersModalOpen && currentUser && <MyOrdersModal onClose={() => setOrdersModalOpen(false)} />}
       {adminLoginOpen && !adminOpen && (
         <AdminLoginPage
           onSuccess={handleAdminLoginSuccess}
@@ -5163,14 +6426,17 @@ export default function App() {
         />
       )}
       {adminOpen && currentUser?.role === 'admin' && (
-        <AdminPanel token={authToken} onClose={() => setAdminOpen(false)} />
+        <AdminPanel
+          onClose={() => setAdminOpen(false)}
+          darkMode={darkMode}
+          onToggleTheme={() => setDarkMode((enabled) => !enabled)}
+        />
       )}
 
       {checkoutOpen && currentUser && currentUser.role === 'client' && (
         <CheckoutModal
           items={cartItems}
           user={currentUser}
-          token={authToken}
           onClose={() => setCheckoutOpen(false)}
           onSuccess={(order) => {
             setCheckoutOpen(false)
@@ -5186,6 +6452,15 @@ export default function App() {
       {legalModal === 'terminos' && <TerminosModal onClose={() => setLegalModal(null)} />}
       {legalModal === 'privacidad' && <PrivacidadModal onClose={() => setLegalModal(null)} />}
       {legalModal === 'cookies' && <CookiesModal onClose={() => setLegalModal(null)} />}
+      {!adminOpen && !adminLoginOpen && <FloatingChatWidget user={currentUser} />}
+      {pageTransition && (
+        <div className="store-transition-screen fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/25 p-4 backdrop-blur-[2px]" role="status" aria-live="polite">
+          <div className="store-transition-screen__card flex min-w-64 flex-col items-center rounded-2xl border px-8 py-7 text-center shadow-2xl">
+            <span className="store-transition-screen__spinner mb-4 h-10 w-10 rounded-full border-[3px] border-emerald-100 border-t-emerald-700" aria-hidden="true" />
+            <span className="text-sm font-semibold text-gray-700">{pageTransition}</span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

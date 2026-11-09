@@ -9,6 +9,13 @@ import siteConfiguration from './.figma/make/site.json'
 export default defineConfig(({ mode }) => {
   // .figma/make/deploy-preview passes `--mode development` for cached-preview builds.
   const emitSourcemaps = mode === 'development'
+  const scriptPolicy = mode === 'development' ? "'self' 'unsafe-inline'" : "'self'"
+  const securityHeaders = {
+    'Content-Security-Policy': `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https://images.unsplash.com; font-src 'self' data: https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src ${scriptPolicy}; worker-src 'self' blob:; connect-src 'self' ws: wss:`,
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  }
 
   return {
     base: process.env.FIGMA_PUBLIC_URL ? `${process.env.FIGMA_PUBLIC_URL}/` : '/',
@@ -31,8 +38,9 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       host: '0.0.0.0',
-      port: 8444,
-      strictPort: true,
+      port: Number(process.env.PORT ?? 8444),
+      strictPort: false,
+      headers: securityHeaders,
       proxy: {
         '/api': {
           target: process.env.API_PROXY_TARGET || 'http://127.0.0.1:4000',
@@ -47,8 +55,9 @@ export default defineConfig(({ mode }) => {
     },
     preview: {
       host: '0.0.0.0',
-      port: 8444,
-      strictPort: true,
+      port: Number(process.env.PORT ?? 8444),
+      strictPort: false,
+      headers: securityHeaders,
     },
   }
 })

@@ -35,6 +35,17 @@ CREATE TABLE IF NOT EXISTS products (
   INDEX idx_products_popular (active, sold_count)
 );
 
+CREATE TABLE IF NOT EXISTS user_wishlist (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT UNSIGNED NOT NULL,
+  product_id BIGINT UNSIGNED NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_user_wishlist_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_user_wishlist_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+  UNIQUE KEY uq_user_wishlist_user_product (user_id, product_id),
+  INDEX idx_user_wishlist_user_created (user_id, created_at)
+);
+
 CREATE TABLE IF NOT EXISTS orders (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT UNSIGNED NOT NULL,
@@ -61,7 +72,8 @@ CREATE TABLE IF NOT EXISTS order_items (
   quantity SMALLINT UNSIGNED NOT NULL,
   CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
   CONSTRAINT fk_order_items_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
-  INDEX idx_order_items_order (order_id)
+  INDEX idx_order_items_order (order_id),
+  INDEX idx_order_items_product_order (product_id, order_id)
 );
 
 CREATE TABLE IF NOT EXISTS invoices (
@@ -102,9 +114,60 @@ CREATE TABLE IF NOT EXISTS offers (
   title VARCHAR(120) NOT NULL,
   discount TINYINT UNSIGNED NOT NULL,
   code VARCHAR(40) NOT NULL UNIQUE,
+  valid_from DATE NOT NULL DEFAULT '2000-01-01',
   valid_until DATE NULL,
   active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT chk_offers_discount CHECK (discount BETWEEN 1 AND 100),
-  INDEX idx_offers_active (active, valid_until)
+  INDEX idx_offers_active (active, valid_from, valid_until)
+);
+
+CREATE TABLE IF NOT EXISTS offer_products (
+  offer_id BIGINT UNSIGNED NOT NULL,
+  product_id BIGINT UNSIGNED NOT NULL,
+  PRIMARY KEY (offer_id, product_id),
+  INDEX idx_offer_products_product (product_id, offer_id),
+  CONSTRAINT fk_offer_products_offer FOREIGN KEY (offer_id) REFERENCES offers(id) ON DELETE CASCADE,
+  CONSTRAINT fk_offer_products_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS service_appointments (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  customer_name VARCHAR(120) NOT NULL,
+  phone VARCHAR(15) NOT NULL,
+  bike VARCHAR(120) NOT NULL,
+  service_name VARCHAR(120) NOT NULL,
+  service_type VARCHAR(80) NULL,
+  scheduled_at DATETIME NOT NULL,
+  status ENUM('pending', 'in_progress', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',
+  observations VARCHAR(500) NOT NULL DEFAULT '',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_service_appointments_schedule (scheduled_at, status),
+  INDEX idx_service_appointments_status (status, scheduled_at)
+);
+
+CREATE TABLE IF NOT EXISTS chat_sessions (
+  session_id CHAR(36) NOT NULL PRIMARY KEY,
+  user_id BIGINT UNSIGNED NULL,
+  escalation_requested BOOLEAN NOT NULL DEFAULT FALSE,
+  contact_name VARCHAR(120) NULL,
+  contact_email VARCHAR(190) NULL,
+  contact_phone VARCHAR(15) NULL,
+  escalation_request VARCHAR(1000) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_chat_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_chat_sessions_user_updated (user_id, updated_at),
+  INDEX idx_chat_sessions_escalation (escalation_requested, created_at)
+);
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  session_id CHAR(36) NOT NULL,
+  sender ENUM('user', 'assistant') NOT NULL,
+  message TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_chat_messages_session FOREIGN KEY (session_id) REFERENCES chat_sessions(session_id) ON DELETE CASCADE,
+  INDEX idx_chat_messages_session_order (session_id, id)
 );
