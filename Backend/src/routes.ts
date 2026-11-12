@@ -1413,14 +1413,26 @@ export function errorHandler(error: unknown, _req: Request, res: Response, _next
     }
     if (['ER_BAD_FIELD_ERROR', 'ER_NO_SUCH_TABLE'].includes(code)) {
       res.status(503).json({
-        error: 'Falta una tabla o columna requerida en MySQL. Aplica las migraciones pendientes del proyecto y reinicia la API.',
+        error: 'Falta una tabla o columna requerida en MySQL. Recrea la base ejecutando SQL/schema.sql y SQL/seed.sql, y reinicia la API.',
       })
       return
     }
     if (code === 'ER_NO_DEFAULT_FOR_FIELD') {
       res.status(503).json({
-        error: 'La tabla de ofertas conserva una columna de producto obligatoria del esquema anterior. Aplica SQL/20261108_product_offers.sql y reinicia la API.',
+        error: 'El esquema de MySQL no coincide con el del proyecto. Recrea la base ejecutando SQL/schema.sql y SQL/seed.sql, y reinicia la API.',
       })
+      return
+    }
+    if (code === 'ER_ACCESS_DENIED_ERROR') {
+      res.status(503).json({ error: 'MySQL rechazó el usuario o la clave. Revisa DB_USER y DB_PASSWORD en Backend/.env y reinicia la API.' })
+      return
+    }
+    if (code === 'ER_BAD_DB_ERROR') {
+      res.status(503).json({ error: 'La base de datos no existe. Ejecuta SQL/schema.sql y SQL/seed.sql, o revisa DB_NAME en Backend/.env.' })
+      return
+    }
+    if (code === 'ECONNREFUSED') {
+      res.status(503).json({ error: 'No se pudo conectar a MySQL. Verifica que esté encendido y revisa DB_HOST y DB_PORT en Backend/.env.' })
       return
     }
     if (['ECONNRESET', 'PROTOCOL_CONNECTION_LOST', 'PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR', 'ETIMEDOUT'].includes(code)) {

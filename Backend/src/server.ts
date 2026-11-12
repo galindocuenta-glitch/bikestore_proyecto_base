@@ -5,6 +5,7 @@ import express from 'express'
 import helmet from 'helmet'
 import { errorHandler, router } from './routes.js'
 import { pool } from './db.js'
+import { ensureInitialAdmin } from './bootstrap-admin.js'
 
 const app = express()
 const port = Number(process.env.PORT ?? 4000)
@@ -67,6 +68,7 @@ app.use(errorHandler)
 
 const server = app.listen(port, '0.0.0.0', () => {
   console.log(`BS Bike Store API disponible en http://0.0.0.0:${port}/api`)
+  void ensureInitialAdmin()
 })
 
 async function shutdown(): Promise<void> {

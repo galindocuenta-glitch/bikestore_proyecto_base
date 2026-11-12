@@ -5,7 +5,7 @@ import { pool } from '../db.js'
 
 const config = z.object({
   ADMIN_NAME: z.string().trim().min(2).default('Administrador BS'),
-  ADMIN_EMAIL: z.string().trim().email("galindocuenta@gmail.com"),
+  ADMIN_EMAIL: z.string().trim().email('ADMIN_EMAIL debe ser un correo válido.'),
   ADMIN_PASSWORD: z.string().min(12).max(72),
 }).parse(process.env)
 

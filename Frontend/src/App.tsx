@@ -5961,7 +5961,7 @@ export default function App() {
           } as Product
         }))
       })
-      .catch((error: unknown) => window.alert(error instanceof Error ? error.message : 'No fue posible cargar el catálogo desde el servidor.'))
+      .catch((error: unknown) => console.warn('No fue posible cargar el catálogo desde el servidor; se muestra el catálogo local.', error))
   }, [adminOpen])
 
   useEffect(() => {
@@ -5971,12 +5971,12 @@ export default function App() {
           try {
             await restoreUserCart(user)
           } catch (error) {
-            window.alert(error instanceof Error ? error.message : 'No fue posible cargar el carrito de tu cuenta.')
+            console.warn('No fue posible cargar el carrito de tu cuenta.', error)
           }
         }
         setCurrentUser(user)
         void refreshUserWishlist(user).catch((error: unknown) => {
-          window.alert(error instanceof Error ? error.message : 'No fue posible cargar tu lista de deseos.')
+          console.warn('No fue posible cargar tu lista de deseos.', error)
         })
         if (user.role === 'admin' && getAdminSectionFromPath(window.location.pathname) !== 'dashboard') {
           setAdminOpen(true)
@@ -5996,7 +5996,7 @@ export default function App() {
   useEffect(() => {
     void apiRequest<PublicReview[]>('/reviews?limit=100')
       .then(setPublicReviews)
-      .catch((error: unknown) => window.alert(error instanceof Error ? error.message : 'No fue posible cargar las reseñas.'))
+      .catch((error: unknown) => console.warn('No fue posible cargar las reseñas.', error))
   }, [])
 
   useEffect(() => () => {

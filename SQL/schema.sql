@@ -1,3 +1,7 @@
+-- Esquema completo de BS Bike Store (instalación nueva). Ya incluye todo lo que antes eran migraciones.
+-- Orden de ejecución:  1) schema.sql   2) seed.sql   3) npm run admin:create (en Backend/)
+-- Orden de tablas: users, products, user_wishlist, cart_items, orders, order_items, invoices, reviews,
+--                  offers, offer_products, service_appointments, chat_sessions, chat_messages.
 CREATE DATABASE IF NOT EXISTS bs_bike_store
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_0900_ai_ci;

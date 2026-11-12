@@ -9,78 +9,16 @@ API REST para el catálogo, las cuentas, los pedidos y las reseñas de BS Bike S
 
 ## Configuración local
 
-1. Crear la base y las tablas desde la carpeta raíz del proyecto:
+1. Crear la base, las tablas y los datos iniciales desde la carpeta raíz del proyecto, en este orden:
 
    ```sh
    mysql -u root -p < SQL/schema.sql
+   mysql -u root -p < SQL/seed.sql
    ```
 
-   Si ya habías creado la base, aplica también la migración de factura e imágenes:
+   `SQL/schema.sql` crea la base `bs_bike_store` con todas las tablas (usuarios, productos, lista de deseos, carrito, pedidos, facturas, reseñas, ofertas, citas de taller y chat). `SQL/seed.sql` carga el catálogo inicial y es repetible: conserva el stock de los productos que ya existen. Ya no hay migraciones sueltas: para empezar de cero, borra la base y vuelve a ejecutar esos dos archivos.
 
-   ```sh
-   mysql -u root -p < SQL/20261008_invoice.sql
-   ```
-
-   Para bases existentes, aplica también la migración de consentimiento y clientes:
-
-   ```sh
-   mysql -u root -p < SQL/20261022_user_consent_clients.sql
-   ```
-
-   En bases existentes creadas antes de que `SQL/schema.sql` incluyera ofertas, crea primero sus tablas:
-
-   ```sh
-   mysql -u root -p < SQL/20261022_admin_controls.sql
-   ```
-
-   Si la API devuelve un error `Unknown column 'r.product_id'`, actualiza la tabla de reseñas de una base existente:
-
-   ```sh
-   mysql -u root -p < SQL/20261106_reviews_product_link.sql
-   ```
-
-   Las reseñas existentes se conservan sin asociar a un producto; las nuevas quedarán vinculadas al producto correspondiente.
-
-   Para bases existentes que ya tienen la tabla `offers`, aplica la migración aditiva de ofertas por producto. Si acabas de crear la base desde el `SQL/schema.sql` actual, omite esta migración: ya incluye las columnas y tablas nuevas.
-
-   ```sh
-   mysql -u root -p < SQL/20261108_product_offers.sql
-   ```
-
-   Conserva los registros y su estado actual, y crea la tabla N:M `offer_products`.
-
-   Para habilitar el agendamiento del taller en una base existente:
-
-   ```sh
-   mysql -u root -p < SQL/20261109_service_appointments.sql
-   ```
-
-   Una instalación nueva desde `SQL/schema.sql` ya incluye la tabla de citas. La hora se persiste en UTC y se muestra al administrador en la zona horaria del navegador.
-
-   Para habilitar el historial persistente del chat en una base existente:
-
-   ```sh
-   mysql -u root -p < SQL/20261109_chat_assistant.sql
-   ```
-
-   Una instalación nueva desde `SQL/schema.sql` ya incluye las tablas de conversación. Las solicitudes de asesoría se guardan en la sesión con los datos de contacto proporcionados.
-
-   Para habilitar la lista de deseos persistente en una base existente:
-
-   ```sh
-   mysql -u root -p < SQL/20261109_user_wishlist.sql
-   ```
-
-   Una instalación nueva desde `SQL/schema.sql` ya incluye `user_wishlist`; cada usuario solo puede consultar y modificar su propia lista.
-
-   Para habilitar el carrito por cuenta en una base existente:
-
-   ```sh
-   mysql -u root -p < SQL/20261109_cart_items.sql
-   ```
-
-   Una instalación nueva desde `SQL/schema.sql` también incluye `cart_items`. Los permisos del usuario de ejecución deben permitir `DELETE` en esa tabla.
-
+   En producción, el usuario de ejecución necesita permiso `DELETE` en `offer_products`, `user_wishlist` y `cart_items` (ver el paso 3).
 2. En `Backend/`, instalar dependencias y crear la configuración local:
 
    ```sh
