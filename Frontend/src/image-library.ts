@@ -105,7 +105,6 @@ const bikeFallbacks: Record<string, string> = {
   ruta: roadBikeFallback,
   urbana: bikeFallback,
   'ciudad y paseo': bikeFallback,
-  urbana: bikeFallback,
   eléctrica: electricBikeFallback,
   electrica: electricBikeFallback,
   infantil: kidsBikeFallback,

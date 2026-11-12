@@ -9,7 +9,7 @@ import { pool } from './db.js'
 const app = express()
 const port = Number(process.env.PORT ?? 4000)
 const isProduction = process.env.NODE_ENV === 'production'
-const allowedOrigins = (process.env.FRONTEND_ORIGIN ?? 'http://localhost:8443')
+const allowedOrigins = (process.env.FRONTEND_ORIGIN ?? 'http://localhost:8444')
   .split(',')
   .map((origin) => origin.trim())
 const isLocalDevelopmentOrigin = (origin: string) =>
@@ -65,8 +65,8 @@ app.use('/api', router)
 app.use((_req, res) => res.status(404).json({ error: 'Ruta no encontrada.' }))
 app.use(errorHandler)
 
-const server = app.listen(port, () => {
-  console.log(`BS Bike Store API disponible en http://localhost:${port}/api`)
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log(`BS Bike Store API disponible en http://0.0.0.0:${port}/api`)
 })
 
 async function shutdown(): Promise<void> {

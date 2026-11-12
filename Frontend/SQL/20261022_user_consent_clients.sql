@@ -1,0 +1,6 @@
+USE bs_bike_store;
+
+ALTER TABLE users
+  ADD COLUMN phone VARCHAR(30) NULL,
+  ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE,
+  ADD COLUMN terms_accepted_at TIMESTAMP NULL;

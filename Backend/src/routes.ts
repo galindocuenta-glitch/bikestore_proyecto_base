@@ -1,6 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from 'express'
 import { rateLimit } from 'express-rate-limit'
 import bcrypt from 'bcryptjs'
+import { randomUUID } from 'node:crypto'
 import type { ResultSetHeader, RowDataPacket } from 'mysql2/promise'
 import { z } from 'zod'
 import { createToken, optionalAuth, requireAdmin, requireAuth, type AuthUser } from './auth.js'
@@ -20,9 +21,10 @@ const asyncRoute = (handler: (req: Request, res: Response) => Promise<unknown>) 
   }
 
 const registerSchema = z.object({
-  name: z.string().trim().min(2).max(120),
-  email: z.string().trim().email().max(190),
-  password: z.string().min(10).max(72),
+  name: z.string().trim().min(1, 'El nombre es obligatorio.').max(120, 'El nombre no puede superar 120 caracteres.'),
+  email: z.string().trim().email('El correo ya está registrado o no tiene formato válido.').max(190, 'El correo no puede superar 190 caracteres.'),
+  phone: z.string().regex(/^\d{10}$/, 'El teléfono debe tener 10 dígitos numéricos.'),
+  password: z.string().min(8, 'La contraseña debe tener mínimo 8 caracteres.').max(72, 'La contraseña no puede superar 72 caracteres.'),
   termsAccepted: z.literal(true, { error: 'Debes aceptar los términos y la política de privacidad.' }),
 })
 
@@ -107,10 +109,9 @@ router.get('/health', asyncRoute(async (_req, res) => {
 
 const chatOwnershipError = () => new HttpError(403, 'No tienes acceso a esta conversación.')
 
-async function ensureChatSession(
+async function ensureGuestChatSession(
   connection: Awaited<ReturnType<typeof pool.getConnection>>,
   sessionId: string,
-  userId: number | null,
 ): Promise<void> {
   const [sessions] = await connection.execute<(RowDataPacket & { userId: number | null })[]>(
     'SELECT user_id AS userId FROM chat_sessions WHERE session_id = ? FOR UPDATE',
@@ -120,14 +121,44 @@ async function ensureChatSession(
   if (!session) {
     await connection.execute(
       'INSERT INTO chat_sessions (session_id, user_id) VALUES (?, ?)',
-      [sessionId, userId],
+      [sessionId, null],
     )
     return
   }
-  if (session.userId !== null && session.userId !== userId) throw chatOwnershipError()
-  if (session.userId === null && userId !== null) {
-    await connection.execute('UPDATE chat_sessions SET user_id = ? WHERE session_id = ?', [userId, sessionId])
-  }
+  if (session.userId !== null) throw chatOwnershipError()
+}
+
+/** Returns the single chat session that belongs to an authenticated user. */
+async function getOrCreateUserChatSession(
+  connection: Awaited<ReturnType<typeof pool.getConnection>>,
+  userId: number,
+): Promise<string> {
+  const [sessions] = await connection.execute<(RowDataPacket & { sessionId: string })[]>(
+    'SELECT session_id AS sessionId FROM chat_sessions WHERE user_id = ? LIMIT 1 FOR UPDATE',
+    [userId],
+  )
+  if (sessions[0]) return sessions[0].sessionId
+
+  const sessionId = randomUUID()
+  await connection.execute(
+    'INSERT INTO chat_sessions (session_id, user_id) VALUES (?, ?)',
+    [sessionId, userId],
+  )
+  return sessionId
+}
+
+/**
+ * Authenticated requests never trust the browser-provided session id: they
+ * always resolve to the canonical session owned by the current account.
+ */
+async function resolveChatSession(
+  connection: Awaited<ReturnType<typeof pool.getConnection>>,
+  requestedSessionId: string,
+  userId: number | null,
+): Promise<string> {
+  if (userId !== null) return getOrCreateUserChatSession(connection, userId)
+  await ensureGuestChatSession(connection, requestedSessionId)
+  return requestedSessionId
 }
 
 async function getChatReply(
@@ -136,6 +167,19 @@ async function getChatReply(
   userId: number | null,
 ): Promise<{ message: string; offerEscalation: boolean }> {
   const query = message.toLocaleLowerCase('es-CO')
+  if (/ver bicicletas|bicicletas disponibles|cat[aá]logo/.test(query)) {
+    const [products] = await connection.execute<(RowDataPacket & { name: string; price: number; category: string })[]>(
+      'SELECT name, price, category FROM products WHERE active = 1 ORDER BY sold_count DESC, name LIMIT 8',
+    )
+    if (!products.length) return { message: 'Por ahora no hay bicicletas disponibles en el catálogo.', offerEscalation: false }
+    const catalog = products.map((product) =>
+      `• ${product.name} (${product.category}): $${Number(product.price).toLocaleString('es-CO')} COP`
+    ).join('\n')
+    return { message: `Estas son algunas bicicletas disponibles:\n${catalog}\n\nPuedes ver el catálogo completo en la tienda.`, offerEscalation: false }
+  }
+  if (/agendar taller|cita de taller|servicio de taller/.test(query)) {
+    return { message: 'Para reservar una revisión, abre “Servicios de taller” en la tienda, elige el servicio y completa el formulario con la fecha que prefieras.', offerEscalation: false }
+  }
   if (/precio|precios|cu[aá]nto|cuesta|bicicleta|bici/.test(query) && /precio|precios|cu[aá]nto|cuesta/.test(query)) {
     const [products] = await connection.execute<(RowDataPacket & { name: string; price: number; category: string })[]>(
       'SELECT name, price, category FROM products WHERE active = 1 ORDER BY sold_count DESC, name LIMIT 8',
@@ -196,23 +240,40 @@ const chatMessageSchema = z.object({
   message: z.string().trim().min(1).max(2000),
 })
 
-router.post('/chat/message', chatLimiter, optionalAuth, asyncRoute(async (req, res) => {
+router.post('/chat/session', chatLimiter, optionalAuth, asyncRoute(async (req, res) => {
+  if (!req.user) throw new HttpError(401, 'Debes iniciar sesión para acceder a tu conversación.')
+  const connection = await pool.getConnection()
+  try {
+    await connection.beginTransaction()
+    const sessionId = await getOrCreateUserChatSession(connection, req.user.id)
+    await connection.commit()
+    res.json({ sessionId })
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
+}))
+
+router.post(['/chat', '/chat/message'], chatLimiter, optionalAuth, asyncRoute(async (req, res) => {
   const input = chatMessageSchema.parse(req.body)
   const connection = await pool.getConnection()
   try {
     await connection.beginTransaction()
-    await ensureChatSession(connection, input.sessionId, req.user?.id ?? null)
+    const sessionId = await resolveChatSession(connection, input.sessionId, req.user?.id ?? null)
     const [userResult] = await connection.execute<ResultSetHeader>(
       'INSERT INTO chat_messages (session_id, sender, message) VALUES (?, ?, ?)',
-      [input.sessionId, 'user', input.message],
+      [sessionId, 'user', input.message],
     )
     const reply = await getChatReply(connection, input.message, req.user?.id ?? null)
     const [assistantResult] = await connection.execute<ResultSetHeader>(
       'INSERT INTO chat_messages (session_id, sender, message) VALUES (?, ?, ?)',
-      [input.sessionId, 'assistant', reply.message],
+      [sessionId, 'assistant', reply.message],
     )
     await connection.commit()
     res.status(201).json({
+      sessionId,
       userMessage: { id: userResult.insertId, sender: 'user', message: input.message, createdAt: new Date().toISOString() },
       assistantMessage: { id: assistantResult.insertId, sender: 'assistant', message: reply.message, createdAt: new Date().toISOString() },
       offerEscalation: reply.offerEscalation,
@@ -230,7 +291,19 @@ router.post('/chat/message', chatLimiter, optionalAuth, asyncRoute(async (req, r
 }))
 
 router.get('/chat/history/:sessionId', chatLimiter, optionalAuth, asyncRoute(async (req, res) => {
-  const sessionId = chatSessionIdSchema.parse(req.params.sessionId)
+  const requestedSessionId = chatSessionIdSchema.parse(req.params.sessionId)
+  let sessionId = requestedSessionId
+  if (req.user) {
+    const [ownedSessions] = await pool.execute<(RowDataPacket & { sessionId: string })[]>(
+      'SELECT session_id AS sessionId FROM chat_sessions WHERE user_id = ? LIMIT 1',
+      [req.user.id],
+    )
+    if (!ownedSessions[0]) {
+      res.json({ sessionId: requestedSessionId, items: [] })
+      return
+    }
+    sessionId = ownedSessions[0].sessionId
+  }
   const [sessions] = await pool.execute<(RowDataPacket & { userId: number | null })[]>(
     'SELECT user_id AS userId FROM chat_sessions WHERE session_id = ? LIMIT 1',
     [sessionId],
@@ -246,7 +319,79 @@ router.get('/chat/history/:sessionId', chatLimiter, optionalAuth, asyncRoute(asy
      FROM chat_messages WHERE session_id = ? ORDER BY id DESC LIMIT 200`,
     [sessionId],
   )
-  res.json({ items: messages.reverse() })
+  res.json({ sessionId, items: messages.reverse() })
+}))
+
+router.get('/admin/chats', requireAuth, requireAdmin, asyncRoute(async (_req, res) => {
+  const [sessions] = await pool.execute<RowDataPacket[]>(`
+    SELECT
+      cs.session_id AS sessionId,
+      cs.user_id AS userId,
+      COALESCE(u.name, cs.contact_name) AS contactName,
+      COALESCE(u.email, cs.contact_email) AS contactEmail,
+      COALESCE(NULLIF(u.phone, ''), cs.contact_phone) AS contactPhone,
+      cs.escalation_requested AS escalationRequested,
+      cs.escalation_request AS escalationRequest,
+      cs.created_at AS createdAt,
+      cs.updated_at AS updatedAt,
+      (SELECT cm.message FROM chat_messages cm WHERE cm.session_id = cs.session_id ORDER BY cm.id DESC LIMIT 1) AS latestMessage,
+      (SELECT cm.created_at FROM chat_messages cm WHERE cm.session_id = cs.session_id ORDER BY cm.id DESC LIMIT 1) AS latestMessageAt,
+      (SELECT COUNT(*) FROM chat_messages cm WHERE cm.session_id = cs.session_id) AS messageCount
+    FROM chat_sessions cs
+    LEFT JOIN users u ON u.id = cs.user_id
+    ORDER BY COALESCE(
+      (SELECT MAX(cm.created_at) FROM chat_messages cm WHERE cm.session_id = cs.session_id),
+      cs.updated_at
+    ) DESC
+    LIMIT 100
+  `)
+  res.json({ items: sessions })
+}))
+
+router.get('/admin/chats/:sessionId', requireAuth, requireAdmin, asyncRoute(async (req, res) => {
+  const sessionId = chatSessionIdSchema.parse(req.params.sessionId)
+  const [sessions] = await pool.execute<RowDataPacket[]>(
+    `SELECT cs.session_id AS sessionId, cs.user_id AS userId,
+      COALESCE(u.name, cs.contact_name) AS contactName,
+      COALESCE(u.email, cs.contact_email) AS contactEmail,
+      COALESCE(NULLIF(u.phone, ''), cs.contact_phone) AS contactPhone,
+      cs.escalation_requested AS escalationRequested,
+      cs.escalation_request AS escalationRequest, cs.created_at AS createdAt, cs.updated_at AS updatedAt
+     FROM chat_sessions cs
+     LEFT JOIN users u ON u.id = cs.user_id
+     WHERE cs.session_id = ? LIMIT 1`,
+    [sessionId],
+  )
+  const session = sessions[0]
+  if (!session) throw new HttpError(404, 'No encontramos esa conversación.')
+  const [messages] = await pool.execute<RowDataPacket[]>(
+    `SELECT id, sender, message, created_at AS createdAt
+     FROM chat_messages WHERE session_id = ? ORDER BY id DESC LIMIT 200`,
+    [sessionId],
+  )
+  res.json({ session, items: messages.reverse() })
+}))
+
+router.get('/admin/notifications', requireAuth, requireAdmin, asyncRoute(async (_req, res) => {
+  const [rows] = await pool.execute<(RowDataPacket & {
+    pendingOrders: number
+    pendingAppointments: number
+    escalations: number
+    criticalProducts: number
+  })[]>(`
+    SELECT
+      (SELECT COUNT(*) FROM orders WHERE status = 'pending') AS pendingOrders,
+      (SELECT COUNT(*) FROM service_appointments WHERE status = 'pending') AS pendingAppointments,
+      (SELECT COUNT(*) FROM chat_sessions WHERE escalation_requested = 1) AS escalations,
+      (SELECT COUNT(*) FROM products WHERE active = 1 AND stock <= 3) AS criticalProducts
+  `)
+  const row = rows[0]
+  res.json({
+    pendingOrders: Number(row?.pendingOrders ?? 0),
+    pendingAppointments: Number(row?.pendingAppointments ?? 0),
+    escalations: Number(row?.escalations ?? 0),
+    criticalProducts: Number(row?.criticalProducts ?? 0),
+  })
 }))
 
 const chatEscalationSchema = z.object({
@@ -262,18 +407,18 @@ router.post('/chat/escalation', chatLimiter, optionalAuth, asyncRoute(async (req
   const connection = await pool.getConnection()
   try {
     await connection.beginTransaction()
-    await ensureChatSession(connection, input.sessionId, req.user?.id ?? null)
+    const sessionId = await resolveChatSession(connection, input.sessionId, req.user?.id ?? null)
     const userMessage = `Solicitud de asesor: ${input.request}`
     const assistantMessage = 'Tu solicitud fue enviada al equipo de Bike Store. Un asesor se comunicará contigo usando los datos que compartiste.'
     await connection.execute(
       `UPDATE chat_sessions
        SET escalation_requested = 1, contact_name = ?, contact_email = ?, contact_phone = ?, escalation_request = ?
        WHERE session_id = ?`,
-      [input.name, input.email.toLowerCase(), input.phone, input.request, input.sessionId],
+      [input.name, input.email.toLowerCase(), input.phone, input.request, sessionId],
     )
     await connection.execute(
       'INSERT INTO chat_messages (session_id, sender, message) VALUES (?, ?, ?), (?, ?, ?)',
-      [input.sessionId, 'user', userMessage, input.sessionId, 'assistant', assistantMessage],
+      [sessionId, 'user', userMessage, sessionId, 'assistant', assistantMessage],
     )
     await connection.commit()
     res.status(201).json({ message: assistantMessage, createdAt: new Date().toISOString() })
@@ -302,11 +447,12 @@ const appointmentSchema = z.object({
   observations: z.string().trim().max(500).default(''),
 })
 
-router.post('/appointments', appointmentLimiter, asyncRoute(async (req, res) => {
+router.post(['/services', '/appointments'], appointmentLimiter, optionalAuth, asyncRoute(async (req, res) => {
   const input = appointmentSchema.parse(req.body)
   const [result] = await pool.execute<ResultSetHeader>(
-    'INSERT INTO service_appointments (customer_name, phone, bike, service_name, service_type, scheduled_at, observations) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO service_appointments (user_id, customer_name, phone, bike, service_name, service_type, scheduled_at, observations) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     [
+      req.user?.id ?? null,
       input.customerName,
       input.phone,
       input.bike,
@@ -317,6 +463,23 @@ router.post('/appointments', appointmentLimiter, asyncRoute(async (req, res) => 
     ],
   )
   res.status(201).json({ id: result.insertId, status: 'pending' })
+}))
+
+router.get('/users/:userId/appointments', requireAuth, asyncRoute(async (req, res) => {
+  const userId = z.coerce.number().int().positive().parse(req.params.userId)
+  if (req.user!.role !== 'admin' && userId !== req.user!.id) {
+    throw new HttpError(403, 'No tienes acceso a estas citas.')
+  }
+  const [appointments] = await pool.execute<RowDataPacket[]>(
+    `SELECT id, customer_name AS customerName, phone, bike, service_name AS serviceName,
+      service_type AS serviceType, DATE_FORMAT(scheduled_at, '%Y-%m-%d %H:%i') AS scheduledAt,
+      status, observations, created_at AS createdAt
+     FROM service_appointments
+     WHERE user_id = ?
+     ORDER BY scheduled_at DESC, id DESC`,
+    [userId],
+  )
+  res.json({ items: appointments })
 }))
 
 router.get('/admin/appointments', requireAuth, requireAdmin, asyncRoute(async (_req, res) => {
@@ -345,13 +508,42 @@ router.patch('/admin/appointments/:id/status', requireAuth, requireAdmin, asyncR
 }))
 
 router.post('/auth/register', loginLimiter, asyncRoute(async (req, res) => {
-  const input = registerSchema.parse(req.body)
-  const passwordHash = await bcrypt.hash(input.password, 12)
-  const [result] = await pool.execute<ResultSetHeader>(
-    'INSERT INTO users (name, email, password_hash, terms_accepted_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
-    [input.name, input.email.toLowerCase(), passwordHash],
+  const parsed = registerSchema.safeParse(req.body)
+  if (!parsed.success) {
+    const errors: Record<string, string> = {}
+    for (const issue of parsed.error.issues) {
+      const field = String(issue.path[0] ?? 'form')
+      if (!errors[field]) errors[field] = issue.message
+    }
+    res.status(400).json({ errors })
+    return
+  }
+  const input = parsed.data
+  const email = input.email.toLowerCase()
+  const [existingUsers] = await pool.execute<RowDataPacket[]>(
+    'SELECT id FROM users WHERE email = ? LIMIT 1',
+    [email],
   )
-  const user: AuthUser = { id: result.insertId, name: input.name, email: input.email.toLowerCase(), role: 'client' }
+  if (existingUsers.length) {
+    res.status(400).json({ errors: { email: 'El correo ya está registrado o no tiene formato válido.' } })
+    return
+  }
+  const passwordHash = await bcrypt.hash(input.password, 12)
+  let result: ResultSetHeader
+  try {
+    ;[result] = await pool.execute<ResultSetHeader>(
+      'INSERT INTO users (name, email, password_hash, phone, terms_accepted_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)',
+      [input.name, email, passwordHash, input.phone],
+    )
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error
+      && String((error as { code?: string }).code ?? '') === 'ER_DUP_ENTRY') {
+      res.status(400).json({ errors: { email: 'El correo ya está registrado o no tiene formato válido.' } })
+      return
+    }
+    throw error
+  }
+  const user: AuthUser = { id: result.insertId, name: input.name, email, role: 'client' }
   res.cookie('bs-bike-store-session', createToken(user), sessionCookieOptions)
   res.status(201).json({ user })
 }))

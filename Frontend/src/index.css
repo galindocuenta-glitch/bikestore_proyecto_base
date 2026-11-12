@@ -394,7 +394,7 @@ img {
 }
 .catalog-card__media {
   position: relative;
-  height: 190px;
+  aspect-ratio: 4 / 3;
   flex: none;
   overflow: hidden;
   border-radius: 16px 16px 0 0;
@@ -460,10 +460,21 @@ img {
   background: transparent !important;
   transition: transform 0.5s ease;
 }
+/* Administrator-created products often use isolated product shots instead of
+   landscape photography. Keep their entire bicycle visible in the same 4:3
+   card frame, with a consistent safe margin instead of cropping it. */
+.catalog-card__image--managed {
+  box-sizing: border-box;
+  padding: 14px;
+  object-fit: contain;
+  object-position: center;
+  background: #f8fafc !important;
+}
 .catalog-card__content {
   display: flex;
   flex: 1;
   flex-direction: column;
+  min-width: 0;
   padding: 20px;
 }
 .catalog-card__eyebrow {
@@ -637,6 +648,7 @@ table.admin-appointments-table thead th {
   #store-header .site-user-menu-button { justify-content: center; padding: 0; }
 
   .catalog-section .catalog-card__content { padding: 1rem; }
+  .catalog-card__media { aspect-ratio: 4 / 3; }
   .catalog-card__purchase { align-items: stretch; flex-direction: column; }
   .catalog-card__add-button { width: 100%; min-height: 3rem; white-space: normal; }
   .catalog-sort { width: 100%; margin-left: 0; justify-content: space-between; }

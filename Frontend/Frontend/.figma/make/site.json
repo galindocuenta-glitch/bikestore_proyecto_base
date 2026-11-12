@@ -1,0 +1,10 @@
+{
+  "description": "Discover high-performance bikes and essential services at BICICENTER BIKESTORE, your go-to e-commerce platform for cycling enthusiasts in Spanish.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

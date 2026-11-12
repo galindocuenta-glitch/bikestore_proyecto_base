@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 node_modules/
 dist/
 build/
@@ -19,3 +20,13 @@ logs/
 # beside it.
 /.plugins/
 /.opencode-skills/
+=======
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+>>>>>>> 90761fdb81a996a94c1970f8756e4ef6ac8f92d7

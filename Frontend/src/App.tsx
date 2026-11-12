@@ -34,7 +34,7 @@ import {
   getWheelImageFallback,
   handleImageFallback,
 } from './image-library'
-import { apiRequest } from './api'
+import { apiRequest, ApiRequestError } from './api'
 import { downloadXlsx } from './xlsx'
 import { jsPDF } from 'jspdf'
 
@@ -270,6 +270,8 @@ const NAV_MENU_CONTENT: Record<string, NavMenuContent> = {
   },
 }
 
+type ProductSpec = { label: string; value: string }
+
 interface Product {
   id: number
   name: string
@@ -285,7 +287,7 @@ interface Product {
   img: string
   badge: string | null
   gallery: string[]
-  specs: { label: string; value: string }[]
+  specs: ProductSpec[]
   description: string
   stock: number
   darkBg?: boolean
@@ -320,6 +322,17 @@ const RUTA5 = 'https://images.unsplash.com/photo-1516147697747-02adcafd3fda?crop
 const RUTA6 = 'https://images.unsplash.com/photo-1486425091969-f62210f08a26?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=800'
 const URB1 = 'https://images.unsplash.com/photo-1501147830916-ce44a6359892?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=800'
 const URB2 = 'https://images.unsplash.com/photo-1505705694340-019e1e335916?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=800'
+const OFFICIAL_BIKE_IMAGES = {
+  electricSpecializedBrown: '/images/bikes/electric-specialized-brown.jpeg',
+  electricSpecializedForest: '/images/bikes/electric-specialized-forest.jpeg',
+  electricSantaCruzPurple: '/images/bikes/electric-santa-cruz-purple.jpeg',
+  electricSantaCruzBlack: '/images/bikes/electric-santa-cruz-black.jpeg',
+  electricScott: '/images/bikes/electric-scott-enduro.jpeg',
+  roadCanyon: '/images/bikes/road-canyon-aeroad.jpeg',
+  roadPinarello: '/images/bikes/road-pinarello.jpeg',
+  roadSWorks: '/images/bikes/road-sworks.jpeg',
+  roadTrek: '/images/bikes/road-trek.jpeg',
+} as const
 
 const ALL_PRODUCTS: Product[] = [
   // ── TODO TERRENO ──────────────────────────────────────────────────
@@ -424,68 +437,58 @@ const ALL_PRODUCTS: Product[] = [
   },
   // ── ELÉCTRICAS ────────────────────────────────────────────────────
   {
-    id: 7, name: 'Scott Strike eRIDE 930', category: 'Eléctrica',
+    id: 7, name: 'SPECIALIZED TURBO LEVO COMP', category: 'Eléctrica',
     price: 5900000, priceLabel: '$5.900.000', rating: 4.9, reviews: 143, badge: 'Más Vendido',
-    img: electricSportImg, stock: 5,
-    gallery: gal(electricSportImg, EMTB, 0),
-    description: 'La Starker Sport 2.0 Pro es una bicicleta eléctrica versátil de la marca colombiana. Su motor, batería extraíble y suspensión delantera ofrecen potencia y autonomía para moverse dentro y fuera de la ciudad.',
+    img: OFFICIAL_BIKE_IMAGES.electricSpecializedBrown, stock: 5,
+    gallery: gal(OFFICIAL_BIKE_IMAGES.electricSpecializedBrown, EMTB, 0),
+    description: 'Bicicleta eléctrica de montaña de doble suspensión, con motor integrado y geometría para senderos técnicos.',
     specs: [
-      { label: 'Marca', value: 'STARKER' }, { label: 'Modelo', value: 'SPORT 2.0 PRO' },
-      { label: 'Motor', value: '350W central' }, { label: 'Batería', value: '500Wh' },
-      { label: 'Autonomía', value: 'Hasta 80 km' }, { label: 'Velocidades', value: '21 velocidades' },
-      { label: 'Rin', value: '27.5"' }, { label: 'Suspensión', value: 'Delantera 100mm' },
+      { label: 'Marca', value: 'SPECIALIZED' }, { label: 'Modelo', value: 'TURBO LEVO COMP' },
+      { label: 'Tipo', value: 'E-MTB de doble suspensión' }, { label: 'Asistencia', value: 'Motor eléctrico integrado' },
     ],
   },
   {
-    id: 8, name: 'EVOBIKE ÁGUILA PRO', category: 'Eléctrica',
+    id: 8, name: 'SPECIALIZED TURBO LEVO SL', category: 'Eléctrica',
     price: 4800000, priceLabel: '$4.800.000', rating: 4.8, reviews: 89, badge: 'Nuevo',
-    img: electricAguilaImg, stock: 4,
-    gallery: gal(electricAguilaImg, EMTB, 1),
-    description: 'La Evobike Águila Pro es la bicicleta eléctrica urbana más elegante de la marca. Motor trasero de 250W con batería de 36V extraíble, perfecta para desplazamientos diarios con asistencia eficiente y diseño moderno.',
+    img: OFFICIAL_BIKE_IMAGES.electricSpecializedForest, stock: 4,
+    gallery: gal(OFFICIAL_BIKE_IMAGES.electricSpecializedForest, EMTB, 1),
+    description: 'Bicicleta eléctrica de montaña con doble suspensión, motor visible y configuración orientada al trail.',
     specs: [
-      { label: 'Marca', value: 'EVOBIKE' }, { label: 'Modelo', value: 'ÁGUILA PRO' },
-      { label: 'Motor', value: '250W trasero' }, { label: 'Batería', value: '36V 10Ah extraíble' },
-      { label: 'Autonomía', value: 'Hasta 60 km' }, { label: 'Velocidades', value: '7 velocidades Shimano' },
-      { label: 'Rin', value: '700c' }, { label: 'Frenos', value: 'Disco hidráulico' },
+      { label: 'Marca', value: 'SPECIALIZED' }, { label: 'Modelo', value: 'TURBO LEVO SL' },
+      { label: 'Tipo', value: 'E-MTB de doble suspensión' }, { label: 'Asistencia', value: 'Motor eléctrico integrado' },
     ],
   },
   {
-    id: 9, name: 'EVOBIKE SOL', category: 'Eléctrica',
+    id: 9, name: 'SANTA CRUZ HECKLER SL', category: 'Eléctrica',
     price: 5200000, priceLabel: '$5.200.000', rating: 4.8, reviews: 62, badge: null,
-    img: electricSolImg, stock: 7,
-    gallery: gal(electricSolImg, EMTB, 2),
-    description: 'La Evobike Sol combina potencia y autonomía en una bicicleta eléctrica completa para toda la familia. Con motor de 350W y batería de 48V, ofrece una conducción asistida suave y progresiva.',
+    img: OFFICIAL_BIKE_IMAGES.electricSantaCruzPurple, stock: 7,
+    gallery: gal(OFFICIAL_BIKE_IMAGES.electricSantaCruzPurple, EMTB, 2),
+    description: 'E-MTB Santa Cruz con doble suspensión, motor integrado y cuadro preparado para recorridos de montaña.',
     specs: [
-      { label: 'Marca', value: 'EVOBIKE' }, { label: 'Modelo', value: 'SOL' },
-      { label: 'Motor', value: '350W central' }, { label: 'Batería', value: '48V 13Ah' },
-      { label: 'Autonomía', value: 'Hasta 90 km' }, { label: 'Velocidades', value: '21 velocidades' },
-      { label: 'Rin', value: '27.5"' }, { label: 'Pantalla', value: 'LCD multifunción' },
+      { label: 'Marca', value: 'SANTA CRUZ' }, { label: 'Modelo', value: 'HECKLER SL' },
+      { label: 'Tipo', value: 'E-MTB de doble suspensión' }, { label: 'Asistencia', value: 'Motor eléctrico integrado' },
     ],
   },
   {
-    id: 10, name: 'GW E-MAX 800W', category: 'Eléctrica',
+    id: 10, name: 'SCOTT PATRON eRIDE', category: 'Eléctrica',
     price: 6500000, priceLabel: '$6.500.000', rating: 4.9, reviews: 55, badge: 'Premium',
-    img: electricEMaxImg, stock: 3,
-    gallery: gal(electricEMaxImg, EMTB, 3),
-    description: 'La GW E-Max 800W es una bicicleta eléctrica diseñada para quienes buscan potencia y comodidad. Su batería de alta densidad y sus acabados modernos brindan una experiencia sobresaliente en ciudad y carretera.',
+    img: OFFICIAL_BIKE_IMAGES.electricScott, stock: 3,
+    gallery: gal(OFFICIAL_BIKE_IMAGES.electricScott, EMTB, 3),
+    description: 'Bicicleta eléctrica Scott de montaña con doble suspensión, asistencia integrada y componentes para trail.',
     specs: [
-      { label: 'Marca', value: 'GW' }, { label: 'Modelo', value: 'E-MAX 800W' },
-      { label: 'Motor', value: '500W trasero' }, { label: 'Batería', value: '48V 15Ah' },
-      { label: 'Autonomía', value: 'Hasta 100 km' }, { label: 'Velocidades', value: '7 velocidades' },
-      { label: 'Rin', value: '700c' }, { label: 'Extras', value: 'Luz LED + guardabarros' },
+      { label: 'Marca', value: 'SCOTT' }, { label: 'Modelo', value: 'PATRON eRIDE' },
+      { label: 'Tipo', value: 'E-MTB de doble suspensión' }, { label: 'Asistencia', value: 'Motor eléctrico integrado' },
     ],
   },
   {
-    id: 20, name: 'STARKER T-FLEX PRO', category: 'Eléctrica',
+    id: 20, name: 'SANTA CRUZ HECKLER', category: 'Eléctrica',
     price: 4200000, priceLabel: '$4.200.000', rating: 4.7, reviews: 48, badge: null,
-    img: electricTFlexImg, stock: 6,
-    gallery: gal(electricTFlexImg, EMTB, 3),
-    description: 'La Starker T-Flex Pro es una bicicleta eléctrica plegable de la reconocida marca colombiana. Es perfecta para la movilidad diaria gracias a su motor eficiente, batería desmontable y diseño compacto para la ciudad.',
+    img: OFFICIAL_BIKE_IMAGES.electricSantaCruzBlack, stock: 6,
+    gallery: gal(OFFICIAL_BIKE_IMAGES.electricSantaCruzBlack, EMTB, 3),
+    description: 'E-MTB Santa Cruz de doble suspensión, con motor integrado y montaje diseñado para rutas de montaña.',
     specs: [
-      { label: 'Marca', value: 'STARKER' }, { label: 'Modelo', value: 'T-FLEX PRO' },
-      { label: 'Motor', value: '250W trasero' }, { label: 'Batería', value: '36V 8Ah' },
-      { label: 'Autonomía', value: 'Hasta 50 km' }, { label: 'Velocidades', value: '7 velocidades' },
-      { label: 'Rin', value: '700c' }, { label: 'Frenos', value: 'Disco mecánico' },
+      { label: 'Marca', value: 'SANTA CRUZ' }, { label: 'Modelo', value: 'HECKLER' },
+      { label: 'Tipo', value: 'E-MTB de doble suspensión' }, { label: 'Asistencia', value: 'Motor eléctrico integrado' },
     ],
   },
   {
@@ -503,55 +506,47 @@ const ALL_PRODUCTS: Product[] = [
   },
   // ── RUTA ──────────────────────────────────────────────────────────
   {
-    id: 11, name: 'Specialized S-Works Epic', category: 'Ruta',
+    id: 11, name: 'CANYON AEROAD CFR', category: 'Ruta',
     price: 3490000, priceLabel: '$3.490.000', rating: 5.0, reviews: 76, badge: 'Pro Tour',
-    img: roadGaviaImg, stock: 3,
-    gallery: gal(roadGaviaImg, ROAD, 0),
-    description: 'La GW Gavia es la bicicleta de ruta bandera de la marca GW. Marco de aluminio aeronáutico, componentes Shimano 105 y ruedas de carbono para competir al más alto nivel. Una máquina diseñada para rodar rápido y cómodo en las carreteras colombianas.',
+    img: OFFICIAL_BIKE_IMAGES.roadCanyon, stock: 3,
+    gallery: gal(OFFICIAL_BIKE_IMAGES.roadCanyon, ROAD, 0),
+    description: 'Bicicleta de ruta aerodinámica Canyon con manillar drop y ruedas de perfil alto, preparada para velocidad en carretera.',
     specs: [
-      { label: 'Marca', value: 'GW' }, { label: 'Modelo', value: 'GAVIA 700C' },
-      { label: 'Marco', value: 'Aluminio aeronáutico' }, { label: 'Velocidades', value: '22 velocidades Shimano 105' },
-      { label: 'Rin', value: '700c' }, { label: 'Frenos', value: 'Disco hidráulico' },
-      { label: 'Peso', value: '8.4 kg' }, { label: 'Garantía', value: '1 año' },
+      { label: 'Marca', value: 'CANYON' }, { label: 'Modelo', value: 'AEROAD CFR' },
+      { label: 'Disciplina', value: 'Ruta aerodinámica' }, { label: 'Manillar', value: 'Drop de carretera' },
     ],
   },
   {
-    id: 12, name: 'Specialized S-Works Epic', category: 'Ruta',
+    id: 12, name: 'PINARELLO DOGMA F', category: 'Ruta',
     price: 2890000, priceLabel: '$2.890.000', rating: 4.9, reviews: 94, badge: 'Más Vendido',
-    img: roadFlammaImg, stock: 5,
-    gallery: gal(roadFlammaImg, ROAD, 2),
-    description: 'La GW Flamma es una bicicleta de ruta ágil y veloz para ciclistas exigentes. Con geometría deportiva, manubrio drop, transmisión de 16 velocidades y frenos de disco para afrontar tanto rutas llanas como subidas empinadas.',
+    img: OFFICIAL_BIKE_IMAGES.roadPinarello, stock: 5,
+    gallery: gal(OFFICIAL_BIKE_IMAGES.roadPinarello, ROAD, 2),
+    description: 'Bicicleta de carretera Pinarello con cuadro aerodinámico, manillar drop y ruedas de alto perfil.',
     specs: [
-      { label: 'Marca', value: 'GW' }, { label: 'Modelo', value: 'FLAMMA DISCO 700C' },
-      { label: 'Marco', value: 'Aluminio 7005' }, { label: 'Velocidades', value: '16 velocidades Shimano Claris' },
-      { label: 'Rin', value: '700c' }, { label: 'Frenos', value: 'Disco mecánico' },
-      { label: 'Peso', value: '9.1 kg' }, { label: 'Garantía', value: '1 año' },
+      { label: 'Marca', value: 'PINARELLO' }, { label: 'Modelo', value: 'DOGMA F' },
+      { label: 'Disciplina', value: 'Ruta de competición' }, { label: 'Manillar', value: 'Drop de carretera' },
     ],
   },
   {
-    id: 22, name: 'Specialized S-Works', category: 'Ruta',
+    id: 22, name: 'SPECIALIZED S-WORKS TARMAC SL8', category: 'Ruta',
     price: 4100000, priceLabel: '$4.100.000', rating: 5.0, reviews: 41, badge: 'Top de Gama',
-    img: roadMortiroloImg, stock: 2,
-    gallery: gal(roadMortiroloImg, ROAD, 4),
-    description: 'La GW Mortirolo 700C toma su nombre de uno de los ascensos más exigentes del ciclismo. Su marco liviano y sus componentes de alto desempeño están pensados para quienes buscan velocidad en carretera.',
+    img: OFFICIAL_BIKE_IMAGES.roadSWorks, stock: 2,
+    gallery: gal(OFFICIAL_BIKE_IMAGES.roadSWorks, ROAD, 4),
+    description: 'Bicicleta de carretera S-Works con cuadro aerodinámico, manillar drop y ruedas Roval de perfil alto.',
     specs: [
-      { label: 'Marca', value: 'GW' }, { label: 'Modelo', value: 'MORTIROLO 700C' },
-      { label: 'Marco', value: 'Carbono T700' }, { label: 'Transmisión', value: 'Shimano Ultegra Di2 12v' },
-      { label: 'Rin', value: '700c' }, { label: 'Frenos', value: 'Disco hidráulico integrado' },
-      { label: 'Peso', value: '7.6 kg' }, { label: 'Garantía', value: '2 años' },
+      { label: 'Marca', value: 'SPECIALIZED' }, { label: 'Modelo', value: 'S-WORKS TARMAC SL8' },
+      { label: 'Disciplina', value: 'Ruta de competición' }, { label: 'Manillar', value: 'Drop de carretera' },
     ],
   },
   {
-    id: 23, name: 'Specialized S-Works Epic', category: 'Ruta',
+    id: 23, name: 'TREK MADONE', category: 'Ruta',
     price: 2450000, priceLabel: '$2.450.000', rating: 4.8, reviews: 63, badge: null,
-    img: roadK2Img, stock: 7,
-    gallery: gal(roadK2Img, ROAD, 3),
-    description: 'La GW K2 es la bicicleta de ruta perfecta para ciclovías y rutas largas del fin de semana. Cómoda, eficiente y de fácil mantenimiento, con cuadro de aluminio y componentes de calidad para rodar kilómetros sin fatiga.',
+    img: OFFICIAL_BIKE_IMAGES.roadTrek, stock: 7,
+    gallery: gal(OFFICIAL_BIKE_IMAGES.roadTrek, ROAD, 3),
+    description: 'Bicicleta de carretera Trek Madone con cuadro aerodinámico, manillar drop y ruedas Bontrager de perfil alto.',
     specs: [
-      { label: 'Marca', value: 'GW' }, { label: 'Modelo', value: 'K2 700C' },
-      { label: 'Marco', value: 'Aluminio 6061' }, { label: 'Velocidades', value: '21 velocidades Shimano' },
-      { label: 'Rin', value: '700c' }, { label: 'Frenos', value: 'V-Brake' },
-      { label: 'Peso', value: '9.8 kg' }, { label: 'Garantía', value: '1 año' },
+      { label: 'Marca', value: 'TREK' }, { label: 'Modelo', value: 'MADONE' },
+      { label: 'Disciplina', value: 'Ruta aerodinámica' }, { label: 'Manillar', value: 'Drop de carretera' },
     ],
   },
   // ── INFANTIL ──────────────────────────────────────────────────────
@@ -849,6 +844,12 @@ function ProductDetailModal({
   }, [product])
 
   if (!product) return null
+  const productSpecs = Array.isArray(product.specs) ? product.specs : []
+  // Products created from the administration panel may not yet have an
+  // explicit gallery. Their primary image must still be visible in detail.
+  const productImages = Array.isArray(product.gallery) && product.gallery.filter(Boolean).length > 0
+    ? product.gallery.filter(Boolean)
+    : [product.img || getBikeCategoryImage(product.category)]
 
   const handleAdd = () => {
     onAddToCart(product)
@@ -888,15 +889,15 @@ function ProductDetailModal({
             <div>
               <div className="rounded-xl overflow-hidden h-72 sm:h-80 mb-3 bg-[#f8f9fa] flex items-center justify-center">
                 <img
-                  src={product.gallery[activeImg]}
+                  src={productImages[activeImg] ?? productImages[0]}
                   alt={product.name}
                   className="max-h-full max-w-full object-contain p-4 transition-all duration-300 img-product"
                   onError={(event) => handleImageFallback(event, getBikeImageFallback(product.category))}
                 />
               </div>
-              {product.gallery.length > 1 && (
+              {productImages.length > 1 && (
                 <div className="grid grid-cols-6 gap-2">
-                  {product.gallery.map((img, i) => (
+                  {productImages.map((img, i) => (
                     <button
                       key={i}
                       onClick={() => setActiveImg(i)}
@@ -940,12 +941,12 @@ function ProductDetailModal({
                   Especificaciones
                 </h3>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                  {product.specs.map((s) => (
+                  {productSpecs.length ? productSpecs.map((s) => (
                     <div key={s.label} className="flex flex-wrap items-baseline gap-x-1 min-w-0">
                       <span className="text-[9px] font-bold text-[#0D5C3A] uppercase tracking-wider shrink-0">{s.label}:</span>
                       <span className="text-[11px] font-semibold text-[#1A1A1A] break-words" style={{ overflowWrap: 'anywhere' }}>{s.value}</span>
                     </div>
-                  ))}
+                  )) : <p className="col-span-2 text-xs text-gray-500">No hay especificaciones registradas para este producto.</p>}
                 </div>
               </div>
 
@@ -1579,7 +1580,7 @@ function ServiceModal({
       mechanicalArea ? `Sistema: ${mechanicalArea}` : '',
     ].filter(Boolean).join(' · ')
     try {
-      const { id } = await apiRequest<{ id: number }>('/appointments', {
+      const { id } = await apiRequest<{ id: number }>('/services', {
         method: 'POST',
         body: {
           customerName: name.trim(),
@@ -1776,30 +1777,51 @@ function FloatingChatWidget({ user }: { user: AuthUser | null }) {
   }, [])
 
   useEffect(() => {
+    let active = true
     try {
-      const savedSessionId = window.localStorage.getItem('bs-bike-store-chat-session')
-      const nextSessionId = savedSessionId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(savedSessionId)
-        ? savedSessionId
-        : window.crypto.randomUUID()
-      window.localStorage.setItem('bs-bike-store-chat-session', nextSessionId)
-      setSessionId(nextSessionId)
+      if (user) {
+        setSessionId('')
+        setMessages([])
+        void apiRequest<{ sessionId: string }>('/chat/session', { method: 'POST' })
+          .then(({ sessionId: canonicalSessionId }) => {
+            if (!active) return
+            window.localStorage.setItem(`bs-bike-store-chat-session-user-${user.id}`, canonicalSessionId)
+            setSessionId(canonicalSessionId)
+          })
+          .catch((sessionError: unknown) => {
+            if (active) setError(sessionError instanceof Error ? sessionError.message : 'No se pudo preparar tu conversación.')
+          })
+      } else {
+        const storageKey = 'bs-bike-store-chat-session-guest'
+        const savedSessionId = window.localStorage.getItem(storageKey)
+        const nextSessionId = savedSessionId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(savedSessionId)
+          ? savedSessionId
+          : window.crypto.randomUUID()
+        window.localStorage.setItem(storageKey, nextSessionId)
+        setSessionId(nextSessionId)
+      }
     } catch (storageError) {
       console.error('No fue posible preparar la sesión persistente del chat.', storageError)
       setError('No se pudo inicializar el chat en este navegador.')
     }
-  }, [])
+    return () => { active = false }
+  }, [user?.id])
 
   useEffect(() => {
     if (!isOpen || !sessionId) return
     let active = true
     setLoadingHistory(true)
     setError('')
-    void apiRequest<{ items: ChatWidgetMessage[] }>(`/chat/history/${encodeURIComponent(sessionId)}`)
-      .then(({ items }) => {
-        if (active) setMessages(items)
+    void apiRequest<{ sessionId?: string; items: ChatWidgetMessage[] }>(`/chat/history/${encodeURIComponent(sessionId)}`)
+      .then(({ sessionId: resolvedSessionId, items }) => {
+        if (!active) return
+        if (resolvedSessionId && resolvedSessionId !== sessionId) setSessionId(resolvedSessionId)
+        setMessages(items)
       })
       .catch((historyError: unknown) => {
-        if (active) setError(historyError instanceof Error ? historyError.message : 'No fue posible cargar el historial del chat.')
+        if (active) setError(historyError instanceof TypeError
+          ? 'No fue posible conectar con el servidor para cargar la conversación.'
+          : historyError instanceof Error ? historyError.message : 'No fue posible cargar el historial del chat.')
       })
       .finally(() => {
         if (active) setLoadingHistory(false)
@@ -1820,9 +1842,8 @@ function FloatingChatWidget({ user }: { user: AuthUser | null }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages, sending, showEscalation, isOpen])
 
-  const sendMessage = async (event: React.FormEvent) => {
-    event.preventDefault()
-    const text = message.trim()
+  const sendMessage = async (draft = message) => {
+    const text = draft.trim()
     if (!text || !sessionId || sending || loadingHistory) return
     setSending(true)
     setError('')
@@ -1831,12 +1852,14 @@ function FloatingChatWidget({ user }: { user: AuthUser | null }) {
         userMessage: ChatWidgetMessage
         assistantMessage: ChatWidgetMessage
         offerEscalation: boolean
-      }>('/chat/message', { method: 'POST', body: { sessionId, message: text } })
+      }>('/chat', { method: 'POST', body: { sessionId, message: text } })
       setMessages((previous) => [...previous, result.userMessage, result.assistantMessage])
       setOfferEscalation(result.offerEscalation)
-      setMessage('')
+      setMessage((previous) => previous === draft ? '' : previous)
     } catch (sendError) {
-      setError(sendError instanceof Error ? sendError.message : 'No fue posible enviar el mensaje.')
+      setError(sendError instanceof ApiRequestError
+        ? sendError.message
+        : 'No fue posible conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.')
     } finally {
       setSending(false)
     }
@@ -1900,6 +1923,21 @@ function FloatingChatWidget({ user }: { user: AuthUser | null }) {
               <div className="max-w-[90%] rounded-2xl rounded-tl-sm bg-white px-3.5 py-3 text-sm text-gray-700 shadow-sm">
                 ¡Hola! Puedo orientarte sobre bicicletas y precios, pedidos, repuestos, pagos y citas de taller.
               </div>
+              {messages.length === 0 && (
+                <div className="flex flex-wrap gap-2" aria-label="Respuestas rápidas">
+                  {['Ver bicicletas', 'Estado de mi pedido', 'Agendar taller'].map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      onClick={() => void sendMessage(suggestion)}
+                      disabled={!sessionId || sending || loadingHistory}
+                      className="rounded-full border border-[#0D5C3A]/20 bg-white px-3 py-1.5 text-xs font-semibold text-[#0D5C3A] transition-colors hover:bg-[#0D5C3A]/5 disabled:opacity-50"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              )}
               {loadingHistory && <p className="text-center text-xs text-gray-500">Cargando conversación…</p>}
               {messages.map((chatMessage) => (
                 <div key={chatMessage.id} className={`flex ${chatMessage.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -1942,7 +1980,7 @@ function FloatingChatWidget({ user }: { user: AuthUser | null }) {
                 </div>
               </form>
             ) : (
-              <form onSubmit={sendMessage} className="flex items-center gap-2 border-t border-gray-100 bg-white p-3">
+              <form onSubmit={(event) => { event.preventDefault(); void sendMessage() }} className="flex items-center gap-2 border-t border-gray-100 bg-white p-3">
                 <input
                   aria-label="Escribe tu mensaje"
                   className={inputClass}
@@ -1950,7 +1988,13 @@ function FloatingChatWidget({ user }: { user: AuthUser | null }) {
                   placeholder="Escribe tu consulta…"
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
-                  disabled={!sessionId || sending || loadingHistory}
+                  disabled={!sessionId || loadingHistory}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault()
+                      void sendMessage()
+                    }
+                  }}
                 />
                 <button type="submit" aria-label="Enviar mensaje" disabled={!message.trim() || !sessionId || sending || loadingHistory} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#0D5C3A] text-white transition-colors hover:bg-[#1A8A5A] disabled:cursor-not-allowed disabled:opacity-50">
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
@@ -2906,6 +2950,7 @@ function AuthModal({
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
   const [confirmPwd, setConfirmPwd] = useState('')
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [forgotEmail, setForgotEmail] = useState('')
@@ -2914,6 +2959,7 @@ function AuthModal({
   const [showPwd, setShowPwd] = useState(false)
   const [showConfirmPwd, setShowConfirmPwd] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   const fail = (msg: string) => {
     setError(msg)
@@ -2944,26 +2990,46 @@ function AuthModal({
 
   const handleRegister = async () => {
     setError('')
-    if (!name.trim() || !email.trim() || !password) return fail('Completa todos los campos')
-    if (password !== confirmPwd) return fail('Las contraseñas no coinciden')
-    if (password.length < 10) return fail('La contraseña debe tener al menos 10 caracteres')
-    if (!email.includes('@')) return fail('Correo inválido')
-    if (!termsAccepted) return fail('Debes aceptar los términos y la política de privacidad')
+    const errors: Record<string, string> = {}
+    if (!name.trim()) errors.name = 'El nombre es obligatorio.'
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errors.email = 'El correo no tiene un formato válido.'
+    if (!/^\d{10}$/.test(phone)) errors.phone = 'El teléfono debe tener 10 dígitos numéricos.'
+    if (password.length < 8) errors.password = 'La contraseña debe tener mínimo 8 caracteres.'
+    if (password !== confirmPwd) errors.confirmPassword = 'Las contraseñas no coinciden.'
+    if (!termsAccepted) errors.termsAccepted = 'Debes aceptar los términos y la política de privacidad.'
+    setFieldErrors(errors)
+    if (Object.keys(errors).length) {
+      fail('Revisa los campos marcados.')
+      return
+    }
     setSubmitting(true)
     try {
       const session = await apiRequest<{ user: AuthUser }>('/auth/register', {
         method: 'POST',
-        body: { name: name.trim(), email: email.trim(), password, termsAccepted },
+        body: { name: name.trim(), email: email.trim(), phone, password, termsAccepted },
       })
       onLogin(session.user)
     } catch (err) {
-      fail(err instanceof Error ? err.message : 'No fue posible crear la cuenta.')
+      if (err instanceof ApiRequestError && err.fieldErrors) {
+        setFieldErrors(err.fieldErrors)
+        fail('Revisa los campos marcados.')
+      } else {
+        fail(err instanceof Error ? err.message : 'No fue posible crear la cuenta.')
+      }
     } finally {
       setSubmitting(false)
     }
   }
 
   const inputCls = 'w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D5C3A]/30 focus:border-[#0D5C3A] transition-all'
+  const registerInputCls = (field: string) => `${inputCls} ${fieldErrors[field] ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`
+  const clearRegisterError = (field: string) => {
+    setFieldErrors((previous) => {
+      const { [field]: _removed, ...remaining } = previous
+      return remaining
+    })
+    setError('')
+  }
 
   return (
     <>
@@ -3128,16 +3194,23 @@ function AuthModal({
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Nombre completo</label>
-                  <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre" />
+                  <input className={registerInputCls('name')} value={name} aria-invalid={Boolean(fieldErrors.name)} aria-describedby={fieldErrors.name ? 'register-name-error' : undefined} onChange={(e) => { setName(e.target.value); clearRegisterError('name') }} placeholder="Tu nombre" />
+                  {fieldErrors.name && <p id="register-name-error" className="mt-1 text-xs text-red-600">{fieldErrors.name}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Correo electrónico</label>
-                  <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@correo.com" />
+                  <input className={registerInputCls('email')} type="email" value={email} aria-invalid={Boolean(fieldErrors.email)} aria-describedby={fieldErrors.email ? 'register-email-error' : undefined} onChange={(e) => { setEmail(e.target.value); clearRegisterError('email') }} placeholder="tu@correo.com" />
+                  {fieldErrors.email && <p id="register-email-error" className="mt-1 text-xs text-red-600">{fieldErrors.email}</p>}
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Teléfono</label>
+                  <input className={registerInputCls('phone')} type="tel" inputMode="numeric" maxLength={10} value={phone} aria-invalid={Boolean(fieldErrors.phone)} aria-describedby={fieldErrors.phone ? 'register-phone-error' : undefined} onKeyDown={handleDigitsOnlyKeyDown} onChange={(e) => { setPhone(digitsOnly(e.target.value).slice(0, 10)); clearRegisterError('phone') }} placeholder="3001234567" />
+                  {fieldErrors.phone && <p id="register-phone-error" className="mt-1 text-xs text-red-600">{fieldErrors.phone}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Contraseña</label>
                   <div className="relative">
-                    <input className={inputCls + ' pr-10'} type={showPwd ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 10 caracteres" />
+                    <input className={registerInputCls('password') + ' pr-10'} type={showPwd ? 'text' : 'password'} value={password} aria-invalid={Boolean(fieldErrors.password)} aria-describedby={fieldErrors.password ? 'register-password-error' : undefined} onChange={(e) => { setPassword(e.target.value); clearRegisterError('password') }} placeholder="Mínimo 8 caracteres" />
                     <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#0D5C3A] transition-colors" tabIndex={-1}>
                       {showPwd
                         ? <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22"/></svg>
@@ -3145,11 +3218,12 @@ function AuthModal({
                       }
                     </button>
                   </div>
+                  {fieldErrors.password && <p id="register-password-error" className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Confirmar contraseña</label>
                   <div className="relative">
-                    <input className={inputCls + ' pr-10'} type={showConfirmPwd ? 'text' : 'password'} value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} placeholder="Repite tu contraseña" onKeyDown={(e) => e.key === 'Enter' && handleRegister()} />
+                    <input className={registerInputCls('confirmPassword') + ' pr-10'} type={showConfirmPwd ? 'text' : 'password'} value={confirmPwd} aria-invalid={Boolean(fieldErrors.confirmPassword)} aria-describedby={fieldErrors.confirmPassword ? 'register-confirm-password-error' : undefined} onChange={(e) => { setConfirmPwd(e.target.value); clearRegisterError('confirmPassword') }} placeholder="Repite tu contraseña" onKeyDown={(e) => e.key === 'Enter' && handleRegister()} />
                     <button type="button" onClick={() => setShowConfirmPwd(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#0D5C3A] transition-colors" tabIndex={-1}>
                       {showConfirmPwd
                         ? <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22"/></svg>
@@ -3157,10 +3231,11 @@ function AuthModal({
                       }
                     </button>
                   </div>
+                  {fieldErrors.confirmPassword && <p id="register-confirm-password-error" className="mt-1 text-xs text-red-600">{fieldErrors.confirmPassword}</p>}
                 </div>
 
                 <label className="flex items-start gap-2 text-xs text-gray-600 leading-relaxed">
-                  <input type="checkbox" required checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-0.5 accent-[#0D5C3A]" />
+                  <input type="checkbox" required checked={termsAccepted} aria-invalid={Boolean(fieldErrors.termsAccepted)} onChange={(e) => { setTermsAccepted(e.target.checked); clearRegisterError('termsAccepted') }} className="mt-0.5 accent-[#0D5C3A]" />
                   <span>
                     Acepto la{' '}
                     <button type="button" onClick={() => onOpenLegal('privacidad')} className="text-[#0D5C3A] underline">Política de Privacidad</button>
@@ -3168,6 +3243,7 @@ function AuthModal({
                     <button type="button" onClick={() => onOpenLegal('terminos')} className="text-[#0D5C3A] underline">Términos y Condiciones</button>.
                   </span>
                 </label>
+                {fieldErrors.termsAccepted && <p className="text-xs text-red-600">{fieldErrors.termsAccepted}</p>}
 
                 {error && <p className="text-xs text-red-500 font-semibold">{error}</p>}
 
@@ -3344,9 +3420,10 @@ function AdminLoginPage({ onSuccess, onBack }: { onSuccess: (user: AuthUser) => 
 
 // ─── Admin Panel ──────────────────────────────────────────────────────────────
 
-type AdminSection = 'dashboard' | 'productos' | 'ofertas' | 'inventario' | 'usuarios' | 'clientes' | 'reportes' | 'pedidos' | 'resenas' | 'taller'
-type DashboardOrdersFilter = 'todos' | 'por-atender'
+type AdminSection = 'dashboard' | 'productos' | 'ofertas' | 'inventario' | 'usuarios' | 'clientes' | 'reportes' | 'pedidos' | 'resenas' | 'taller' | 'chats'
+type DashboardOrdersFilter = 'todos' | 'por-atender' | 'pendiente' | 'en_proceso' | 'entregado'
 type DashboardActiveFilter = 'all' | 'active'
+type InventoryStockFilter = 'all' | 'critical' | 'empty'
 type DashboardSalesFilter = 'all' | 'delivered'
 type AppointmentFilter = 'all' | 'pending' | 'in_progress' | 'completed' | 'cancelled'
 type AppointmentStatus = AppointmentFilter
@@ -3364,12 +3441,42 @@ interface ServiceAppointment {
   createdAt: string
 }
 
+interface AdminChatSession {
+  sessionId: string
+  userId: number | null
+  contactName: string | null
+  contactEmail: string | null
+  contactPhone: string | null
+  escalationRequested: boolean | number
+  escalationRequest: string | null
+  createdAt: string
+  updatedAt: string
+  latestMessage: string | null
+  latestMessageAt: string | null
+  messageCount: number
+}
+
+interface AdminChatMessage {
+  id: number
+  sender: 'user' | 'assistant'
+  message: string
+  createdAt: string
+}
+
+interface AdminNotifications {
+  pendingOrders: number
+  pendingAppointments: number
+  escalations: number
+  criticalProducts: number
+}
+
 const ADMIN_ROUTE_SECTIONS: Record<string, AdminSection> = {
   '/admin/pedidos': 'pedidos',
   '/admin/reportes': 'reportes',
   '/admin/clientes': 'clientes',
   '/admin/inventario': 'inventario',
   '/admin/taller': 'taller',
+  '/admin/chats': 'chats',
 }
 
 function getAdminSectionFromPath(pathname: string): AdminSection {
@@ -3386,7 +3493,9 @@ function getDashboardSalesFilter(search: string): DashboardSalesFilter {
 
 function getDashboardOrdersFilter(search: string): DashboardOrdersFilter {
   const filter = new URLSearchParams(search).get('filter')
-  return filter === 'pending' || filter === 'por-atender' ? 'por-atender' : 'todos'
+  return filter === 'pending' || filter === 'por-atender' ? 'por-atender'
+    : filter === 'pendiente' || filter === 'en_proceso' || filter === 'entregado' ? filter
+      : 'todos'
 }
 
 function getAppointmentFilter(search: string): AppointmentFilter {
@@ -3403,7 +3512,7 @@ const MOCK_ORDERS = [
 ]
 
 interface AdminProduct {
-  id: number; name: string; category: string; price: number; stock: number; img: string; active: boolean
+  id: number; name: string; category: string; price: number; stock: number; img: string; active: boolean; specs: ProductSpec[]
 }
 interface AdminUser {
   id: number; name: string; email: string; role: 'admin'; createdAt: string; active: boolean
@@ -3420,7 +3529,7 @@ interface AdminReview {
 }
 
 const INIT_ADMIN_PRODUCTS: AdminProduct[] = ALL_PRODUCTS.map((p) => ({
-  id: p.id, name: p.name, category: p.category, price: p.price, stock: p.stock, img: p.img, active: true,
+  id: p.id, name: p.name, category: p.category, price: p.price, stock: p.stock, img: p.img, active: true, specs: p.specs,
 }))
 
 const INIT_CLIENTS: AdminClient[] = [
@@ -3466,6 +3575,7 @@ function AdminPanel({
   const [inventoryFilter, setInventoryFilter] = useState<DashboardActiveFilter>(() =>
     getDashboardActiveFilter(window.location.search, 'status'),
   )
+  const [inventoryStockFilter, setInventoryStockFilter] = useState<InventoryStockFilter>('all')
   const [salesFilter, setSalesFilter] = useState<DashboardSalesFilter>(() =>
     getDashboardSalesFilter(window.location.search),
   )
@@ -3493,6 +3603,7 @@ function AdminPanel({
       clientes: '/admin/clientes',
       inventario: '/admin/inventario',
       taller: '/admin/taller',
+      chats: '/admin/chats',
     }
     const pathname = paths[nextSection] ?? '/'
     const routeQuery = query ?? (
@@ -3568,6 +3679,7 @@ function AdminPanel({
           ...item,
           img: item.img || localById.get(item.id)?.img || '',
           active: item.active,
+          specs: Array.isArray(item.specs) ? item.specs : [],
         })))
       })
       .catch((error: unknown) => window.alert(error instanceof Error ? error.message : 'No fue posible cargar los productos de administración.'))
@@ -3575,7 +3687,14 @@ function AdminPanel({
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [savingProduct, setSavingProduct] = useState(false)
   const [editProduct, setEditProduct] = useState<AdminProduct | null>(null)
-  const [newProduct, setNewProduct] = useState({ name: '', category: 'Todo Terreno', price: '', stock: '', imgPreview: '' })
+  const [newProduct, setNewProduct] = useState<{
+    name: string
+    category: string
+    price: string
+    stock: string
+    imgPreview: string
+    specs: ProductSpec[]
+  }>({ name: '', category: 'Todo Terreno', price: '', stock: '', imgPreview: '', specs: [] })
 
   // Users state
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -3639,11 +3758,65 @@ function AdminPanel({
   const [orders, setOrders] = useState<OrderRow[]>([])
   const [orderStatuses, setOrderStatuses] = useState<Record<string, string>>({})
   const [appointments, setAppointments] = useState<ServiceAppointment[]>([])
+  const [adminChats, setAdminChats] = useState<AdminChatSession[]>([])
+  const [adminChatMessages, setAdminChatMessages] = useState<AdminChatMessage[]>([])
+  const [selectedAdminChat, setSelectedAdminChat] = useState<AdminChatSession | null>(null)
+  const [adminNotifications, setAdminNotifications] = useState<AdminNotifications>({
+    pendingOrders: 0,
+    pendingAppointments: 0,
+    escalations: 0,
+    criticalProducts: 0,
+  })
+  const [adminChatsLoading, setAdminChatsLoading] = useState(false)
+  const [adminChatMessagesLoading, setAdminChatMessagesLoading] = useState(false)
+  const [adminChatsError, setAdminChatsError] = useState('')
   useEffect(() => {
     void apiRequest<{ items: ServiceAppointment[] }>('/admin/appointments')
       .then(({ items }) => setAppointments(items))
       .catch((error: unknown) => window.alert(error instanceof Error ? error.message : 'No fue posible cargar las citas del taller.'))
   }, [])
+  useEffect(() => {
+    let active = true
+    const refreshAdminCommunications = async () => {
+      try {
+        const [chatResponse, notifications] = await Promise.all([
+          apiRequest<{ items: AdminChatSession[] }>('/admin/chats'),
+          apiRequest<AdminNotifications>('/admin/notifications'),
+        ])
+        if (!active) return
+        setAdminChats(chatResponse.items)
+        setAdminNotifications(notifications)
+        setAdminChatsError('')
+      } catch (error) {
+        if (active) setAdminChatsError(error instanceof Error ? error.message : 'No fue posible cargar chats y notificaciones.')
+      } finally {
+        if (active) setAdminChatsLoading(false)
+      }
+    }
+    setAdminChatsLoading(true)
+    void refreshAdminCommunications()
+    const refreshTimer = window.setInterval(() => void refreshAdminCommunications(), 30_000)
+    return () => {
+      active = false
+      window.clearInterval(refreshTimer)
+    }
+  }, [])
+  const openAdminChat = async (session: AdminChatSession) => {
+    setSelectedAdminChat(session)
+    setAdminChatMessages([])
+    setAdminChatMessagesLoading(true)
+    setAdminChatsError('')
+    try {
+      const { items } = await apiRequest<{ items: AdminChatMessage[] }>(
+        `/admin/chats/${encodeURIComponent(session.sessionId)}`,
+      )
+      setAdminChatMessages(items)
+    } catch (error) {
+      setAdminChatsError(error instanceof Error ? error.message : 'No fue posible cargar la conversación.')
+    } finally {
+      setAdminChatMessagesLoading(false)
+    }
+  }
   useEffect(() => {
     void apiRequest<{
       id: number
@@ -3707,6 +3880,7 @@ function AdminPanel({
     { id: 'clientes', label: 'Clientes', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
     { id: 'resenas', label: 'Reseñas', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> },
     { id: 'reportes', label: 'Reportes', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg> },
+    { id: 'chats', label: 'Chats y alertas', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/></svg> },
   ]
 
   const handleImgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -3729,12 +3903,15 @@ function AdminPanel({
       window.alert('Ingresa un nombre, un precio entero mayor que cero y un inventario válido.')
       return
     }
+    const imageUrl = newProduct.imgPreview || getBikeCategoryImage(newProduct.category)
     const payload = {
       name: newProduct.name.trim(),
       category: newProduct.category,
       price,
       stock,
-      imageUrl: newProduct.imgPreview || getBikeCategoryImage(newProduct.category),
+      imageUrl,
+      specs: newProduct.specs.filter((spec) => spec.label.trim() && spec.value.trim())
+        .map((spec) => ({ label: spec.label.trim(), value: spec.value.trim() })),
     }
     setSavingProduct(true)
     try {
@@ -3746,7 +3923,7 @@ function AdminPanel({
       } else {
         const created = await apiRequest<{ id: number }>('/products', {
           method: 'POST',
-          body: { ...payload, description: '', gallery: [], specs: [], active: true, imageUrl: newProduct.imgPreview || null },
+          body: { ...payload, description: '', gallery: [imageUrl], active: true },
         })
         setAdminProducts((prev) => [...prev, {
           id: created.id,
@@ -3756,11 +3933,12 @@ function AdminPanel({
           stock: payload.stock,
           img: payload.imageUrl,
           active: true,
+          specs: payload.specs,
         }])
       }
       setShowAddProduct(false)
       setEditProduct(null)
-      setNewProduct({ name: '', category: 'Todo Terreno', price: '', stock: '', imgPreview: '' })
+      setNewProduct({ name: '', category: 'Todo Terreno', price: '', stock: '', imgPreview: '', specs: [] })
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'No fue posible guardar el producto.')
     } finally {
@@ -3827,7 +4005,14 @@ function AdminPanel({
 
   const openEditProduct = (p: AdminProduct) => {
     setEditProduct(p)
-    setNewProduct({ name: p.name, category: p.category, price: String(p.price), stock: String(p.stock), imgPreview: p.img })
+    setNewProduct({
+      name: p.name,
+      category: p.category,
+      price: String(p.price),
+      stock: String(p.stock),
+      imgPreview: p.img,
+      specs: Array.isArray(p.specs) ? p.specs : [],
+    })
     setShowAddProduct(true)
   }
 
@@ -4047,39 +4232,45 @@ function AdminPanel({
     product.category.toLowerCase().includes(productSearch.toLowerCase())
   )
   const filteredInventoryProducts = filteredProducts.filter((product) =>
-    inventoryFilter === 'all' || (product.active && product.stock > 0)
+    (inventoryFilter === 'all' || (product.active && product.stock > 0)) &&
+    (inventoryStockFilter === 'all'
+      || (inventoryStockFilter === 'critical' && product.stock > 0 && product.stock <= 3)
+      || (inventoryStockFilter === 'empty' && product.stock === 0))
   )
   const criticalStockProducts = adminProducts.filter((product) => product.stock <= 3)
   const filteredUsers = users.filter((admin) =>
     admin.name.toLowerCase().includes(userSearch.toLowerCase()) ||
     admin.email.toLowerCase().includes(userSearch.toLowerCase())
   )
+  const normalizeOrderStatus = (value: string) => {
+    const rawStatus = value.trim().toLowerCase()
+    if (rawStatus === 'pending') return 'pendiente'
+    if (['processing', 'confirmed', 'confirmado'].includes(rawStatus)) return 'en_proceso'
+    if (rawStatus === 'delivered') return 'entregado'
+    if (rawStatus === 'shipped') return 'enviado'
+    if (rawStatus === 'cancelled') return 'cancelado'
+    return rawStatus
+  }
   const filteredOrders = orders.filter((order) => {
     if (filtroEstado === 'todos') return true
-    const rawStatus = (orderStatuses[order.id] || order.status).trim().toLowerCase()
-    const status = ['en_proceso', 'processing', 'confirmed'].includes(rawStatus) ? 'confirmado' : rawStatus
-    return status === 'pendiente' || status === 'pending' || status === 'confirmado'
+    const status = normalizeOrderStatus(orderStatuses[order.id] || order.status)
+    if (filtroEstado === 'por-atender') return status === 'pendiente' || status === 'en_proceso'
+    return status === filtroEstado
   })
   const filteredAppointments = appointments.filter((appointment) =>
     appointmentsFilter === 'all' || appointment.status === appointmentsFilter
   )
+  const notificationTotal = adminNotifications.pendingOrders
+    + adminNotifications.pendingAppointments
+    + adminNotifications.escalations
+    + adminNotifications.criticalProducts
 
   const inputCls = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D5C3A]/30 focus:border-[#0D5C3A] transition-all'
   const btnPrimary = 'bg-[#0D5C3A] hover:bg-[#1A8A5A] text-white font-bold px-4 py-2 rounded-xl text-sm transition-colors'
   const btnOutline = 'border border-gray-200 hover:border-[#0D5C3A] text-gray-600 hover:text-[#0D5C3A] font-semibold px-4 py-2 rounded-xl text-sm transition-colors'
 
   return (
-    <div data-admin-theme={darkMode ? 'dark' : 'light'} className="admin-panel fixed inset-0 z-[100] flex bg-[#F4F4F5]">
-      <style>{`
-        [data-admin-theme="dark"]{color-scheme:dark;background:var(--page-bg);color:var(--text-primary)}
-        [data-admin-theme="dark"] [class~="bg-white"],[data-admin-theme="dark"] [class~="bg-[#F4F4F5]"],[data-admin-theme="dark"] [class~="bg-gray-50"],[data-admin-theme="dark"] [class~="bg-gray-100"]{background-color:var(--surface)!important}
-        [data-admin-theme="dark"] [class*="bg-[#F4F4F5]/"]{background-color:var(--surface-raised)!important}
-        [data-admin-theme="dark"] [class~="text-[#1A1A1A]"],[data-admin-theme="dark"] [class~="text-gray-700"]{color:var(--text-primary)!important}
-        [data-admin-theme="dark"] [class~="text-gray-600"],[data-admin-theme="dark"] [class~="text-gray-500"],[data-admin-theme="dark"] [class~="text-gray-400"]{color:var(--text-secondary)!important}
-        [data-admin-theme="dark"] [class~="border-gray-100"],[data-admin-theme="dark"] [class~="border-gray-200"]{border-color:var(--border-subtle)!important}
-        [data-admin-theme="dark"] input,[data-admin-theme="dark"] select,[data-admin-theme="dark"] textarea{background-color:var(--surface-raised);color:var(--text-primary);border-color:var(--border-subtle)}
-        [data-admin-theme="dark"] input::placeholder,[data-admin-theme="dark"] textarea::placeholder{color:var(--text-secondary)}
-      `}</style>
+    <div data-admin-theme={darkMode ? 'dark' : 'light'} className="admin-panel fixed inset-0 z-[100] flex bg-[#F4F4F5] text-slate-900">
       {/* Sidebar */}
       <aside className={`${sidebarOpen ? 'w-56' : 'w-16'} bg-[#1A1A1A] flex flex-col flex-shrink-0 transition-all duration-300 overflow-hidden`}>
         <div className="flex items-center justify-between px-4 py-5 border-b border-white/10">
@@ -4106,7 +4297,14 @@ function AdminPanel({
               }`}
             >
               {item.icon}
-              {sidebarOpen && <span>{item.label}</span>}
+              {sidebarOpen && (
+                <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                  <span>{item.label}</span>
+                  {item.id === 'chats' && notificationTotal > 0 && (
+                    <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white">{notificationTotal}</span>
+                  )}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -4243,6 +4441,37 @@ function AdminPanel({
                 ))}
               </div>
 
+              <section className={`admin-content-card mb-8 rounded-2xl border p-5 shadow-sm ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-100' : 'border-gray-100 bg-white text-slate-900'}`} aria-labelledby="admin-notifications-title">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 id="admin-notifications-title" className={`text-sm font-black uppercase tracking-wide ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Notificaciones</h2>
+                    <p className={`mt-1 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Pendientes de pedidos, taller, chat e inventario</p>
+                  </div>
+                  <button type="button" onClick={() => navigateToAdminSection('chats')} className={btnOutline}>
+                    Ver chats y alertas
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                  {[
+                    { label: 'Solicitudes de chat', value: adminNotifications.escalations, action: () => navigateToAdminSection('chats') },
+                    { label: 'Pedidos pendientes', value: adminNotifications.pendingOrders, action: () => navigateToOrders('por-atender') },
+                    { label: 'Citas pendientes', value: adminNotifications.pendingAppointments, action: () => navigateToAppointments('pending') },
+                    { label: 'Stock crítico', value: adminNotifications.criticalProducts, action: () => navigateToInventory('all') },
+                  ].map((notification) => (
+                    <button
+                      key={notification.label}
+                      type="button"
+                      onClick={notification.action}
+                      className={`rounded-xl border p-4 text-left transition-colors hover:border-[#0D5C3A]/40 ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-700' : 'border-gray-100 bg-[#F8FAF9] text-slate-900 hover:bg-white'}`}
+                    >
+                      <span className="block text-2xl font-black text-[#0D5C3A]">{notification.value}</span>
+                      <span className={`mt-1 block text-xs font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{notification.label}</span>
+                    </button>
+                  ))}
+                </div>
+                {adminChatsError && <p role="alert" className="mt-3 text-sm text-red-600">{adminChatsError}</p>}
+              </section>
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
                   <h3 className="font-black text-sm text-[#1A1A1A] mb-4 uppercase tracking-wide">Productos con stock crítico</h3>
@@ -4337,14 +4566,89 @@ function AdminPanel({
             </div>
           )}
 
+          {section === 'chats' && (
+            <section className={`admin-content-card rounded-2xl border p-5 shadow-sm ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-100' : 'border-gray-100 bg-white text-slate-900'}`}>
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Conversaciones de clientes</h2>
+                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Mensajes guardados en MySQL · actualización automática cada 30 segundos</p>
+                </div>
+                <span className="rounded-full bg-[#0D5C3A]/10 px-3 py-1 text-xs font-bold text-[#0D5C3A]">
+                  {adminChats.length} conversaciones
+                </span>
+              </div>
+              {adminChatsError && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{adminChatsError}</p>}
+              <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(16rem,0.8fr)_minmax(0,1.2fr)]">
+                <div className={`max-h-[34rem] min-w-0 overflow-y-auto rounded-xl border ${darkMode ? 'border-slate-700 bg-slate-900' : 'border-gray-100 bg-slate-50'}`}>
+                  {adminChatsLoading && adminChats.length === 0 && <p className={`p-5 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cargando conversaciones…</p>}
+                  {!adminChatsLoading && adminChats.length === 0 && <p className={`p-5 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Todavía no hay conversaciones.</p>}
+                  {adminChats.map((chat) => (
+                    <button
+                      key={chat.sessionId}
+                      type="button"
+                      onClick={() => void openAdminChat(chat)}
+                      className={`block w-full border-b p-4 text-left transition-colors ${darkMode ? 'border-slate-700 hover:bg-slate-800' : 'border-gray-100 hover:bg-slate-100'} ${selectedAdminChat?.sessionId === chat.sessionId ? (darkMode ? 'bg-emerald-500/15' : 'bg-[#0D5C3A]/5') : ''}`}
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <span className={`truncate text-sm font-bold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>{chat.contactName || (chat.userId ? 'Cliente registrado' : 'Visitante')}</span>
+                        {!!chat.escalationRequested && <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Asesor</span>}
+                      </span>
+                      <span className={`mt-1 block truncate text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{chat.contactEmail || chat.latestMessage || 'Sin mensajes todavía'}</span>
+                      <span className={`mt-2 block line-clamp-2 text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{chat.latestMessage || chat.escalationRequest || 'Conversación iniciada'}</span>
+                      <span className={`mt-2 block text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {chat.latestMessageAt ? formatAppointmentDate(chat.latestMessageAt) : formatAppointmentDate(chat.createdAt)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className={`flex min-h-[24rem] min-w-0 flex-col overflow-hidden rounded-xl border ${darkMode ? 'border-slate-700 bg-slate-900' : 'border-gray-100 bg-[#F8FAF9]'}`}>
+                  {!selectedAdminChat ? (
+                    <div className={`m-auto p-6 text-center text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Selecciona una conversación para ver sus mensajes.</div>
+                  ) : (
+                    <>
+                      <header className={`border-b p-4 ${darkMode ? 'border-slate-700 bg-slate-800' : 'border-gray-100 bg-white'}`}>
+                        <h3 className={`font-bold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>{selectedAdminChat.contactName || (selectedAdminChat.userId ? 'Cliente registrado' : 'Visitante')}</h3>
+                        <p className={`break-all text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                          {[selectedAdminChat.contactEmail, selectedAdminChat.contactPhone].filter(Boolean).join(' · ') || (selectedAdminChat.userId ? 'Datos de contacto no disponibles' : 'Sin datos de contacto')}
+                        </p>
+                        {!!selectedAdminChat.escalationRequested && (
+                          <p className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">
+                            Solicitud de asesor: {selectedAdminChat.escalationRequest || 'El cliente solicita atención personalizada.'}
+                          </p>
+                        )}
+                      </header>
+                      <div className="flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
+                        {adminChatMessagesLoading && <p className={`text-center text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Cargando mensajes…</p>}
+                        {!adminChatMessagesLoading && adminChatMessages.length === 0 && <p className={`text-center text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Esta conversación aún no tiene mensajes.</p>}
+                        {adminChatMessages.map((chatMessage) => (
+                          <div key={chatMessage.id} className={`flex ${chatMessage.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[90%] whitespace-pre-wrap rounded-2xl px-3.5 py-3 text-sm ${
+                              chatMessage.sender === 'user' ? 'bg-[#0D5C3A] text-white' : (darkMode ? 'bg-slate-800 text-slate-100 shadow-sm' : 'bg-white text-slate-700 shadow-sm')
+                            }`}>
+                              <p>{chatMessage.message}</p>
+                              <time className="mt-1 block text-[10px] opacity-70">
+                                {new Date(chatMessage.createdAt).toLocaleString('es-CO')}
+                              </time>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
+
           {section === 'taller' && (
-            <section className="admin-content-card bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <section className={`admin-content-card rounded-2xl border shadow-sm overflow-hidden ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-100' : 'border-gray-100 bg-white text-slate-900'}`}>
               <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-lg font-black text-[#1A1A1A]">Agendamientos de taller</h2>
-                  <p className="text-xs text-gray-500">{filteredAppointments.length} citas</p>
+                  <h2 className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Agendamientos de taller</h2>
+                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{filteredAppointments.length} citas</p>
                 </div>
-                <label className="flex items-center gap-2 text-xs font-semibold text-gray-500">
+                <label className={`flex items-center gap-2 text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                   Estado
                   <select
                     aria-label="Filtrar citas por estado"
@@ -4362,7 +4666,7 @@ function AdminPanel({
               </div>
               <div className="overflow-x-auto">
                 <table className="admin-appointments-table w-full text-sm">
-                  <thead className="bg-[#F4F4F5]">
+                  <thead className={darkMode ? 'bg-slate-900' : 'bg-[#F4F4F5]'}>
                     <tr>
                       {['ID','Cliente','Teléfono','Servicio','Bicicleta','Fecha y hora','Estado','Observaciones'].map((heading) => (
                         <th key={heading} className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">{heading}</th>
@@ -4416,7 +4720,7 @@ function AdminPanel({
             <div>
               <div className="flex items-center justify-between mb-5">
                 <p className="text-sm text-gray-500">{filteredProducts.length} productos registrados</p>
-                <button onClick={() => { setEditProduct(null); setNewProduct({ name:'', category:'Todo Terreno', price:'', stock:'', imgPreview:'' }); setShowAddProduct(true) }} className={btnPrimary}>
+                <button onClick={() => { setEditProduct(null); setNewProduct({ name:'', category:'Todo Terreno', price:'', stock:'', imgPreview:'', specs:[] }); setShowAddProduct(true) }} className={btnPrimary}>
                   + Agregar producto
                 </button>
               </div>
@@ -4452,6 +4756,14 @@ function AdminPanel({
                     </div>
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">Foto del producto</label>
+                      <input
+                        className={inputCls + ' mb-3'}
+                        type="url"
+                        aria-label="URL de imagen del producto"
+                        placeholder="Pega la URL de la imagen"
+                        value={newProduct.imgPreview.startsWith('data:') ? '' : newProduct.imgPreview}
+                        onChange={(event) => setNewProduct((product) => ({ ...product, imgPreview: event.target.value }))}
+                      />
                       <label className="flex items-center gap-3 cursor-pointer border-2 border-dashed border-gray-200 hover:border-[#0D5C3A] rounded-xl p-4 transition-colors">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8 text-gray-400">
                           <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
@@ -4470,6 +4782,52 @@ function AdminPanel({
                         <input type="file" accept="image/*" className="hidden" onChange={handleImgUpload} />
                       </label>
                     </div>
+                    <fieldset className="sm:col-span-2">
+                      <legend className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">Especificaciones técnicas</legend>
+                      <div className="space-y-2">
+                        {newProduct.specs.map((spec, index) => (
+                          <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                            <input
+                              className={inputCls}
+                              aria-label={`Nombre de especificación ${index + 1}`}
+                              placeholder="Ej. Marco"
+                              maxLength={120}
+                              value={spec.label}
+                              onChange={(event) => setNewProduct((product) => ({
+                                ...product,
+                                specs: product.specs.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item),
+                              }))}
+                            />
+                            <input
+                              className={inputCls}
+                              aria-label={`Valor de especificación ${index + 1}`}
+                              placeholder="Ej. Aluminio"
+                              maxLength={300}
+                              value={spec.value}
+                              onChange={(event) => setNewProduct((product) => ({
+                                ...product,
+                                specs: product.specs.map((item, itemIndex) => itemIndex === index ? { ...item, value: event.target.value } : item),
+                              }))}
+                            />
+                            <button
+                              type="button"
+                              aria-label={`Eliminar especificación ${index + 1}`}
+                              onClick={() => setNewProduct((product) => ({ ...product, specs: product.specs.filter((_, itemIndex) => itemIndex !== index) }))}
+                              className="rounded-lg border border-gray-200 px-3 text-gray-500 hover:border-red-300 hover:text-red-600"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setNewProduct((product) => ({ ...product, specs: [...product.specs, { label: '', value: '' }] }))}
+                        className="mt-3 rounded-lg border border-dashed border-[#0D5C3A]/40 px-3 py-2 text-xs font-bold text-[#0D5C3A] hover:bg-[#0D5C3A]/5"
+                      >
+                        + Agregar especificación
+                      </button>
+                    </fieldset>
                   </div>
                   <div className="flex gap-3 mt-5">
                     <button onClick={() => void saveProduct()} disabled={savingProduct} className={btnPrimary + ' disabled:opacity-50'}>{savingProduct ? 'Guardando…' : editProduct ? 'Guardar cambios' : 'Crear producto'}</button>
@@ -4559,14 +4917,24 @@ function AdminPanel({
               </label>
               <div className="grid grid-cols-3 gap-4 mb-6">
                 {[
-                  { label: 'Total unidades', value: adminProducts.reduce((s,p)=>s+p.stock,0), color: '#0D5C3A' },
-                  { label: 'Stock crítico (≤3)', value: adminProducts.filter(p=>p.stock>0&&p.stock<=3).length, color: '#0D5C3A' },
-                  { label: 'Sin stock', value: adminProducts.filter(p=>p.stock===0).length, color: '#0D5C3A' },
+                  { label: 'Total unidades', value: adminProducts.reduce((sum, product) => sum + product.stock, 0), color: '#0D5C3A', filter: 'all' as const },
+                  { label: 'Stock crítico (≤3)', value: adminProducts.filter((product) => product.stock > 0 && product.stock <= 3).length, color: '#0D5C3A', filter: 'critical' as const },
+                  { label: 'Sin stock', value: adminProducts.filter((product) => product.stock === 0).length, color: '#0D5C3A', filter: 'empty' as const },
                 ].map(s=>(
-                  <div key={s.label} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                  <button
+                    key={s.label}
+                    type="button"
+                    aria-pressed={inventoryStockFilter === s.filter && (s.filter !== 'all' || inventoryFilter === 'all')}
+                    onClick={() => {
+                      setInventoryFilter('all')
+                      setInventoryStockFilter(s.filter)
+                      setAdminPage('inventory', 1)
+                    }}
+                    className={`rounded-2xl bg-white p-5 text-left shadow-sm transition-all ${inventoryStockFilter === s.filter && (s.filter !== 'all' || inventoryFilter === 'all') ? 'border-2 border-[#0D5C3A] ring-2 ring-[#0D5C3A]/10' : 'border border-gray-100 hover:border-[#0D5C3A]/40'}`}
+                  >
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{s.label}</p>
                     <p className="text-3xl font-black" style={{color:s.color, fontFamily:'Montserrat, sans-serif'}}>{s.value}</p>
-                  </div>
+                  </button>
                 ))}
               </div>
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -5083,6 +5451,9 @@ function AdminPanel({
                   >
                     <option value="todos">Todos los pedidos</option>
                     <option value="por-atender">Por atender</option>
+                    <option value="pendiente">Pendientes</option>
+                    <option value="en_proceso">En proceso</option>
+                    <option value="entregado">Entregados</option>
                   </select>
                   <span className="whitespace-nowrap text-[11px] text-gray-500" aria-live="polite">
                     {filteredOrders.length} {filteredOrders.length === 1 ? 'pedido' : 'pedidos'}
@@ -5169,15 +5540,21 @@ function AdminPanel({
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 {[
-                  { label: 'Total pedidos', value: orders.length, color: '#0D5C3A' },
-                  { label: 'Pendientes', value: orders.filter(o=>(orderStatuses[o.id]||o.status)==='pendiente').length, color: '#0D5C3A' },
-                  { label: 'En proceso', value: orders.filter(o=>(orderStatuses[o.id]||o.status)==='en_proceso').length, color: '#0D5C3A' },
-                  { label: 'Entregados', value: orders.filter(o=>(orderStatuses[o.id]||o.status)==='entregado').length, color: '#0D5C3A' },
+                  { label: 'Total pedidos', value: orders.length, color: '#0D5C3A', filter: 'todos' as const },
+                  { label: 'Pendientes', value: orders.filter((order) => normalizeOrderStatus(orderStatuses[order.id] || order.status) === 'pendiente').length, color: '#0D5C3A', filter: 'pendiente' as const },
+                  { label: 'En proceso', value: orders.filter((order) => normalizeOrderStatus(orderStatuses[order.id] || order.status) === 'en_proceso').length, color: '#0D5C3A', filter: 'en_proceso' as const },
+                  { label: 'Entregados', value: orders.filter((order) => normalizeOrderStatus(orderStatuses[order.id] || order.status) === 'entregado').length, color: '#0D5C3A', filter: 'entregado' as const },
                 ].map(s => (
-                  <div key={s.label} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:scale-105 transition-transform duration-200">
+                  <button
+                    key={s.label}
+                    type="button"
+                    aria-pressed={filtroEstado === s.filter}
+                    onClick={() => updateOrdersFilter(s.filter)}
+                    className={`rounded-2xl bg-white p-5 text-left shadow-sm transition-all hover:scale-[1.02] ${filtroEstado === s.filter ? 'border-2 border-[#0D5C3A] ring-2 ring-[#0D5C3A]/10' : 'border border-gray-100 hover:border-[#0D5C3A]/40'}`}
+                  >
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{s.label}</p>
                     <p className="text-3xl font-black" style={{color:s.color, fontFamily:'Montserrat, sans-serif'}}>{s.value}</p>
-                  </div>
+                  </button>
                 ))}
               </div>
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -5327,15 +5704,6 @@ function AdminPanel({
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
-function getSavedThemePreference(): boolean {
-  try {
-    return window.localStorage.getItem('bs-bike-store-theme') === 'dark'
-  } catch (error) {
-    console.warn('No fue posible leer la preferencia de tema guardada.', error)
-    return false
-  }
-}
-
 const CART_STORAGE_KEY = 'bs-bike-store-cart'
 const WISHLIST_STORAGE_KEY = 'bs-bike-store-wishlist'
 
@@ -5430,6 +5798,7 @@ export default function App() {
   const [priceMin, setPriceMin] = useState('')
   const [priceMax, setPriceMax] = useState('')
   const [addedId, setAddedId] = useState<number | null>(null)
+  const [cartToast, setCartToast] = useState('')
   const [selectedService, setSelectedService] = useState<(typeof SERVICES)[0] | null>(null)
   const [selectedPartCategory, setSelectedPartCategory] = useState<(typeof PART_CATEGORIES)[0] | null>(null)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
@@ -5442,11 +5811,13 @@ export default function App() {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [legalModal, setLegalModal] = useState<'terminos' | 'privacidad' | 'cookies' | null>(null)
-  const [darkMode, setDarkMode] = useState(getSavedThemePreference)
+  // The initial experience is always light; the theme control can opt in to dark mode.
+  const [darkMode, setDarkMode] = useState(false)
   const [publicReviews, setPublicReviews] = useState<PublicReview[]>([])
   const searchRef = useRef<HTMLInputElement>(null)
   const headerRef = useRef<HTMLElement>(null)
   const transitionTimeoutRef = useRef<number | null>(null)
+  const cartToastTimeoutRef = useRef<number | null>(null)
   const wishlistRequestsRef = useRef(new Set<number>())
   const cartSyncReadyUserIdRef = useRef<number | null>(null)
   const cartSyncQueueRef = useRef<Promise<void>>(Promise.resolve())
@@ -5684,6 +6055,12 @@ export default function App() {
     })
     playCartAddedSound()
     setAddedId(product.id)
+    setCartToast(`${product.name} se añadió al carrito`)
+    if (cartToastTimeoutRef.current !== null) window.clearTimeout(cartToastTimeoutRef.current)
+    cartToastTimeoutRef.current = window.setTimeout(() => {
+      setCartToast('')
+      cartToastTimeoutRef.current = null
+    }, 3000)
     setTimeout(() => setAddedId(null), 1500)
   }
 
@@ -5829,6 +6206,13 @@ export default function App() {
 
   return (
     <div className="app-shell min-h-screen dark:text-gray-100 transition-colors duration-200">
+      {cartToast && (
+        <div role="status" aria-live="polite" className="fixed right-4 top-4 z-[220] flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-2xl bg-[#0D5C3A] px-4 py-3 text-sm font-bold text-white shadow-2xl motion-safe:animate-[pulse_0.35s_ease-out_1]">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/20" aria-hidden="true">✓</span>
+          <span className="line-clamp-2">{cartToast}</span>
+          <button type="button" onClick={() => setCartToast('')} aria-label="Cerrar notificación" className="rounded-full p-1 text-white/80 hover:bg-white/15 hover:text-white">×</button>
+        </div>
+      )}
       {/* ─── NAV ─────────────────────────────────────────────────────────── */}
       <header
         ref={headerRef}
@@ -6271,9 +6655,9 @@ export default function App() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid min-w-0 grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {filteredProducts.map((p) => (
-                <div key={p.id} className="catalog-card group hover:-translate-y-1">
+                <div key={p.id} className="catalog-card group min-w-0 hover:-translate-y-1">
                   <div
                     className="catalog-card__media relative cursor-zoom-in"
                     onClick={() => setSelectedProduct(p)}
@@ -6281,7 +6665,9 @@ export default function App() {
                     <img
                       src={p.img || getBikeCategoryImage(p.category)}
                       alt={p.name}
-                      className="catalog-card__image absolute inset-0 transition-transform duration-500 group-hover:scale-105"
+                      className={`catalog-card__image absolute inset-0 transition-transform duration-500 group-hover:scale-105 ${
+                        ALL_PRODUCTS.some((catalogProduct) => catalogProduct.id === p.id) ? '' : 'catalog-card__image--managed'
+                      }`}
                       loading="lazy"
                       decoding="async"
                       onError={(event) => handleImageFallback(event, getBikeImageFallback(p.category))}
